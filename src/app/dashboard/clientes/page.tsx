@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { listarClientasConPedidos } from "@/models/clientas.model";
 import { ClientesTabla } from "@/components/dashboard/clientes-tabla";
-import { Users, Zap } from "lucide-react";
+import { Users, Zap, AlertTriangle } from "lucide-react";
 
 function esHoy(fechaIso: string) {
   const fecha = new Date(fechaIso);
@@ -14,8 +14,15 @@ function esHoy(fechaIso: string) {
 }
 
 export default async function ClientesPage() {
-  const supabase = await createClient();
-  const clientas = await listarClientasConPedidos(supabase);
+  let clientas: Awaited<ReturnType<typeof listarClientasConPedidos>> = [];
+  let errorMsg: string | null = null;
+
+  try {
+    const supabase = await createClient();
+    clientas = await listarClientasConPedidos(supabase);
+  } catch {
+    errorMsg = "No se pudo conectar con la base de datos.";
+  }
 
   const activasHoy = clientas.filter((c) =>
     c.pedidos.some((p) => esHoy(p.fecha_pedido))
@@ -23,6 +30,13 @@ export default async function ClientesPage() {
 
   return (
     <div className="max-w-[1280px] mx-auto p-4 md:p-6">
+      {errorMsg && (
+        <div className="mb-6 flex items-center gap-3 bg-error-container/30 border border-error/30 rounded-2xl p-4">
+          <AlertTriangle size={20} className="text-error shrink-0" />
+          <p className="font-sans text-sm text-on-surface-variant">{errorMsg}</p>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-2 mb-8">
         <div>
           <h2 className="font-display text-2xl md:text-[32px] font-semibold text-primary mb-1">

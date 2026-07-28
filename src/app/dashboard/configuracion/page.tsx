@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { Settings, Lock, MapPin } from "lucide-react";
+import { Settings, Lock, MapPin, AlertTriangle } from "lucide-react";
 import { CambiarClaveForm } from "@/components/dashboard/cambiar-clave-form";
 import { WhatsappNumeroForm } from "@/components/dashboard/whatsapp-numero-form";
 import { SedesRetiroPanel } from "@/components/dashboard/sedes-retiro-panel";
@@ -7,16 +7,33 @@ import { obtenerConfiguracion } from "@/models/configuracion.model";
 import { listarSedes } from "@/models/sedes.model";
 
 export default async function ConfiguracionPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const whatsappNumero =
-    (await obtenerConfiguracion(supabase, "whatsapp_numero")) ??
-    process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ??
-    "";
-  const sedes = await listarSedes(supabase);
+  let user: { email?: string; id?: string } | null = null;
+  let whatsappNumero = "";
+  let sedes: Awaited<ReturnType<typeof listarSedes>> = [];
+  let errorMsg: string | null = null;
+
+  try {
+    const supabase = await createClient();
+    const { data: { user: u } } = await supabase.auth.getUser();
+    user = u;
+    whatsappNumero =
+      (await obtenerConfiguracion(supabase, "whatsapp_numero")) ??
+      process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ??
+      "";
+    sedes = await listarSedes(supabase);
+  } catch {
+    errorMsg = "No se pudo conectar con la base de datos.";
+  }
 
   return (
     <div className="max-w-[800px] mx-auto p-4 md:p-6">
+      {errorMsg && (
+        <div className="mb-6 flex items-center gap-3 bg-error-container/30 border border-error/30 rounded-2xl p-4">
+          <AlertTriangle size={20} className="text-error shrink-0" />
+          <p className="font-sans text-sm text-on-surface-variant">{errorMsg}</p>
+        </div>
+      )}
+
       <div className="mb-8">
         <h2 className="font-display text-2xl md:text-[32px] font-semibold text-on-surface flex items-center gap-3">
           <Settings size={28} />

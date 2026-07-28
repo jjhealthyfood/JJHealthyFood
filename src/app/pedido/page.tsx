@@ -17,12 +17,10 @@ export default async function PedidoPage() {
   ]);
 
   const proteinas = opciones.filter((o) => o.categoria === "proteina");
-  const carbohidratos = opciones
-    .filter((o) => o.categoria === "carbohidrato" && !o.excluido_extra)
-    .map((o) => o.nombre);
-  const vegetales = opciones
-    .filter((o) => o.categoria === "vegetal" && !o.excluido_extra)
-    .map((o) => o.nombre);
+  const carbohidratosFull = opciones.filter((o) => o.categoria === "carbohidrato");
+  const vegetalesFull = opciones.filter((o) => o.categoria === "vegetal");
+  const carbohidratos = carbohidratosFull.map((o) => o.nombre);
+  const vegetales = vegetalesFull.map((o) => o.nombre);
   const opcionesDesayuno = opciones
     .filter((o) => o.categoria === "desayuno");
   const platos = opciones.filter((o) => o.categoria === "plato");
@@ -32,6 +30,8 @@ export default async function PedidoPage() {
       proteinas={proteinas}
       carbohidratos={carbohidratos}
       vegetales={vegetales}
+      carbohidratosFull={carbohidratosFull}
+      vegetalesFull={vegetalesFull}
       opcionesDesayuno={opcionesDesayuno}
       sedes={sedes}
       extrasConfig={extrasConfig}

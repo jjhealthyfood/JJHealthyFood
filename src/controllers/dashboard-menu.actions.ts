@@ -9,6 +9,7 @@ import {
   actualizarPrecioRacion,
   actualizarExtrasConfig,
   toggleExcluidoExtra,
+  actualizarExtraPriceOverride,
 } from "@/models/menu.model";
 import type { CategoriaMenu, NivelProteina } from "@/models/types";
 import type { ExtrasConfig } from "@/models/menu.model";
@@ -20,15 +21,17 @@ export async function crearOpcionMenu(
     nivel?: NivelProteina;
     precioRacion?: number;
     precioMacroGramo?: number;
+    precioExtra?: number;
   }
 ) {
   const limpio = nombre.trim();
-  if (!limpio) return;
+  if (!limpio) return null;
 
   const supabase = await createClient();
-  await agregarOpcionMenu(supabase, categoria, limpio, detalles);
+  const nueva = await agregarOpcionMenu(supabase, categoria, limpio, detalles);
   revalidatePath("/dashboard/menu");
   revalidatePath("/pedido");
+  return nueva;
 }
 
 export async function borrarOpcionMenu(id: string) {
@@ -205,6 +208,13 @@ export async function guardarExtrasConfig(config: Partial<ExtrasConfig>) {
 export async function toggleExtraOpcion(id: string, excluido: boolean) {
   const supabase = await createClient();
   await toggleExcluidoExtra(supabase, id, excluido);
+  revalidatePath("/dashboard/menu");
+  revalidatePath("/pedido");
+}
+
+export async function cambiarExtraPriceOverride(id: string, precio: number | null) {
+  const supabase = await createClient();
+  await actualizarExtraPriceOverride(supabase, id, precio);
   revalidatePath("/dashboard/menu");
   revalidatePath("/pedido");
 }

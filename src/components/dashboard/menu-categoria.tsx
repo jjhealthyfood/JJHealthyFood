@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, X, Pencil } from "lucide-react";
+import { Plus, X, Pencil, AlertTriangle } from "lucide-react";
 import {
   crearOpcionMenu,
   borrarOpcionMenu,
@@ -221,12 +221,14 @@ export function MenuCategoria({
   categoria,
   titulo,
   opciones,
+  todosLosNombres,
   esProteina = false,
   esPlato = false,
 }: {
   categoria: CategoriaMenu;
   titulo: string;
   opciones: OpcionMenu[];
+  todosLosNombres?: string[];
   esProteina?: boolean;
   esPlato?: boolean;
 }) {
@@ -237,6 +239,7 @@ export function MenuCategoria({
   const [precioMacro, setPrecioMacro] = useState(esPlato ? "12" : "12");
   const [precioDesayuno, setPrecioDesayuno] = useState("7");
   const [pending, startTransition] = useTransition();
+  const [errorNombre, setErrorNombre] = useState("");
 
   const sencillas = opciones.filter((o) => o.nivel === "sencilla");
   const premium = opciones.filter((o) => o.nivel === "premium");
@@ -255,6 +258,17 @@ export function MenuCategoria({
   function agregar() {
     const nombre = nuevo.trim();
     if (!nombre) return;
+
+    const nombresAComparar = todosLosNombres ?? opciones.map((o) => o.nombre);
+    const existe = nombresAComparar.some(
+      (n) => n.toLowerCase() === nombre.toLowerCase()
+    );
+    if (existe) {
+      setErrorNombre(`"${nombre}" ya existe en el menú`);
+      return;
+    }
+
+    setErrorNombre("");
     setNuevo("");
     startTransition(async () => {
       if (esProteina) {
@@ -423,7 +437,10 @@ export function MenuCategoria({
               <input
                 type="text"
                 value={nuevo}
-                onChange={(e) => setNuevo(e.target.value)}
+                onChange={(e) => {
+                  setNuevo(e.target.value);
+                  setErrorNombre("");
+                }}
                 placeholder="Nombre..."
                 disabled={pending}
                 className="flex-1 min-w-[140px] h-10 px-3 bg-surface-container-low border border-outline-variant rounded-xl font-sans text-sm focus:ring-2 focus:ring-primary outline-none"
@@ -462,6 +479,12 @@ export function MenuCategoria({
                 <Plus size={18} />
               </button>
             </div>
+            {errorNombre && (
+              <span className="flex items-center gap-1 text-xs text-error font-sans mt-1">
+                <AlertTriangle size={11} />
+                {errorNombre}
+              </span>
+            )}
           </div>
         </>
       ) : (
@@ -489,7 +512,10 @@ export function MenuCategoria({
               <input
                 type="text"
                 value={nuevo}
-                onChange={(e) => setNuevo(e.target.value)}
+                onChange={(e) => {
+                  setNuevo(e.target.value);
+                  setErrorNombre("");
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") agregar();
                 }}
@@ -548,6 +574,12 @@ export function MenuCategoria({
                 <Plus size={18} />
               </button>
             </div>
+            {errorNombre && (
+              <span className="flex items-center gap-1 text-xs text-error font-sans mt-1">
+                <AlertTriangle size={11} />
+                {errorNombre}
+              </span>
+            )}
             {(categoria === "carbohidrato" || categoria === "vegetal") && (
               <p className="text-[11px] text-on-surface-variant font-sans mt-2">
                 Incluido sin costo extra.

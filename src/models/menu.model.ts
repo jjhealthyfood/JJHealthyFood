@@ -29,6 +29,7 @@ export async function agregarOpcionMenu(
     nivel?: NivelProteina;
     precioRacion?: number;
     precioMacroGramo?: number;
+    precioExtra?: number;
   }
 ): Promise<OpcionMenu> {
   const { data, error } = await supabase
@@ -127,6 +128,8 @@ export async function actualizarExtrasConfig(
   }
 }
 
+
+
 export async function toggleExcluidoExtra(
   supabase: SupabaseClient,
   id: string,
@@ -135,6 +138,18 @@ export async function toggleExcluidoExtra(
   const { error } = await supabase
     .from("opciones_menu")
     .update({ excluido_extra: excluido })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function actualizarExtraPriceOverride(
+  supabase: SupabaseClient,
+  id: string,
+  precio: number | null
+): Promise<void> {
+  const { error } = await supabase
+    .from("opciones_menu")
+    .update({ extra_price_override: precio })
     .eq("id", id);
   if (error) throw error;
 }

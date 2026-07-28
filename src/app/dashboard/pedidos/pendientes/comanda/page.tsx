@@ -6,8 +6,14 @@ import { ResumenCocina } from "@/components/dashboard/resumen-cocina";
 import { AutoPrint } from "@/components/dashboard/auto-print";
 
 export default async function ComandasPendientesPage() {
-  const supabase = await createClient();
-  const pedidos = await listarPedidosPendientesParaComanda(supabase);
+  let pedidos: Awaited<ReturnType<typeof listarPedidosPendientesParaComanda>> = [];
+
+  try {
+    const supabase = await createClient();
+    pedidos = await listarPedidosPendientesParaComanda(supabase);
+  } catch {
+    pedidos = [];
+  }
 
   return (
     <div className="min-h-screen bg-surface-container-low py-8 px-4 print:bg-white print:p-0 print:min-h-0">

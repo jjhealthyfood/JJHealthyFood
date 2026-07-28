@@ -80,4 +80,5 @@ export type OpcionMenu = {
   precio_macro_gramo: number | null;
   orden: number;
   excluido_extra: boolean;
+  extra_price_override: number | null;
 };
