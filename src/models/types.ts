@@ -10,6 +10,7 @@ export type Clienta = {
 export type DiaEntrega = "domingo" | "lunes";
 export type EstadoPedido = "pendiente" | "en_preparacion" | "entregado";
 export type ModoPedido = "racion" | "macro";
+export type TipoEntrega = "pickup" | "delivery";
 
 export type Pedido = {
   id: string;
@@ -20,8 +21,10 @@ export type Pedido = {
   modo: ModoPedido;
   precio_total: number;
   notas: string | null;
+  tipo_entrega: TipoEntrega;
   sede_nombre: string | null;
   sede_direccion: string | null;
+  direccion_entrega: string | null;
 };
 
 export type SedeRetiro = {

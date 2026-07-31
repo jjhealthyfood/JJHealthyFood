@@ -34,7 +34,7 @@ export default async function ComandasPendientesPage() {
         ) : (
           <>
             <ResumenCocina pedidos={pedidos} />
-            <div className="space-y-2 print:space-y-0 print:grid print:grid-cols-2 print:gap-x-4 print:gap-y-2 print:items-start">
+            <div className="space-y-2 print:space-y-0 print:block">
               {pedidos.map((pedido, index) => (
                 <ComandaTicket
                   key={pedido.id}

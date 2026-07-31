@@ -61,6 +61,7 @@ export function PedidosRecientes({
       (pedido.clientas?.nombre ?? "").toLowerCase().includes(termino) ||
       pedido.id.slice(0, 5).toLowerCase().includes(termino) ||
       (pedido.sede_nombre ?? "").toLowerCase().includes(termino) ||
+      (pedido.direccion_entrega ?? "").toLowerCase().includes(termino) ||
       detalleComidas(pedido).toLowerCase().includes(termino)
     );
   });
@@ -152,7 +153,9 @@ export function PedidosRecientes({
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-1 text-on-surface-variant text-sm">
                         <MapPin size={14} />
-                        {pedido.sede_nombre ?? "—"}
+                        {pedido.tipo_entrega === "delivery"
+                          ? `Delivery — ${pedido.direccion_entrega ?? "—"}`
+                          : pedido.sede_nombre ?? "—"}
                       </div>
                     </td>
                     <td className="px-6 py-5">
@@ -186,7 +189,9 @@ export function PedidosRecientes({
                       {pedido.clientas?.nombre ?? "Clienta eliminada"}
                     </span>
                     <span className="text-sm text-on-surface-variant">
-                      {pedido.sede_nombre ?? "—"}
+                      {pedido.tipo_entrega === "delivery"
+                        ? `Delivery — ${pedido.direccion_entrega ?? "—"}`
+                        : pedido.sede_nombre ?? "—"}
                     </span>
                   </div>
                   <EstadoSelector

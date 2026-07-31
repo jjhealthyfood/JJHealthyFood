@@ -5,14 +5,16 @@ import { crearPedido } from "@/models/pedidos.model";
 import { crearComidasPedido } from "@/models/comidas-pedido.model";
 import { obtenerConfiguracion } from "@/models/configuracion.model";
 import { listarSedesActivas } from "@/models/sedes.model";
-import type { ComidaPedido, DiaEntrega, ModoPedido } from "@/models/types";
+import type { ComidaPedido, DiaEntrega, ModoPedido, TipoEntrega } from "@/models/types";
 
 export type DatosEntrega = {
   nombre: string;
   telefono: string;
   detalles: string;
   dia_entrega: DiaEntrega;
+  tipo_entrega: TipoEntrega;
   sede_id: string;
+  direccion_entrega: string;
 };
 
 export type ComidaSeleccionada = Omit<ComidaPedido, "id" | "pedido_id">;
@@ -26,6 +28,15 @@ export type ClientaEncontrada = {
 export type ResultadoEnvioPedido =
   | { success: true; whatsappUrl: string }
   | { success: false; error: string };
+
+const ZIP_FLORIDA_REGEX = /\b3[2-4]\d{3}\b/;
+const ESTADO_FLORIDA_REGEX = /\bFL\b|florida/i;
+
+function esDireccionFloridaValida(direccion: string): boolean {
+  const texto = direccion.trim();
+  if (texto.length < 10) return false;
+  return ESTADO_FLORIDA_REGEX.test(texto) && ZIP_FLORIDA_REGEX.test(texto);
+}
 
 function formatearMoneda(valor: number) {
   return new Intl.NumberFormat("en-US", {
@@ -55,8 +66,8 @@ function construirMensajeWhatsapp(
   modo: ModoPedido,
   comidas: ComidaSeleccionada[],
   total: number,
-  sedeNombre: string,
-  sedeDireccion: string
+  sedeNombre: string | null,
+  sedeDireccion: string | null
 ) {
   const lineas = comidas
     .map((c) => {
@@ -76,13 +87,17 @@ function construirMensajeWhatsapp(
 
   const diaLabel = datos.dia_entrega === "domingo" ? "Sunday" : "Monday";
   const modoLabel = modo === "macro" ? "Macro" : "By Portion";
+  const entregaLinea =
+    datos.tipo_entrega === "delivery"
+      ? `*Delivery to:* ${datos.direccion_entrega}`
+      : `*Pickup at:* ${sedeNombre} — ${sedeDireccion}`;
 
   return (
     `*✅ Order #${numeroOrden} received!*\n\n` +
     `Hi JJ Healthy Food! I'd like to place this order (${modoLabel}):\n\n${lineas}\n\n` +
     `*Estimated total: ${formatearMoneda(total)}*\n\n` +
-    `*Pickup day:* ${diaLabel}\n` +
-    `*Pickup at:* ${sedeNombre} — ${sedeDireccion}\n` +
+    `*${datos.tipo_entrega === "delivery" ? "Delivery" : "Pickup"} day:* ${diaLabel}\n` +
+    `${entregaLinea}\n` +
     `*Name:* ${datos.nombre}` +
     (datos.detalles ? `\n*Details:* ${datos.detalles}` : "")
   );
@@ -109,14 +124,25 @@ export async function enviarPedido(
 
   const supabase = await createClient();
 
-  const sedesActivas = await listarSedesActivas(supabase);
-  const sedeElegida = sedesActivas.find((s) => s.id === datosEntrega.sede_id);
-  if (!sedeElegida) {
-    console.log("Error: sede de retiro invalida o inactiva");
-    return {
-      success: false,
-      error: "Please choose a valid pickup location and try again.",
-    };
+  let sedeElegida: { nombre: string; direccion: string } | null = null;
+  if (datosEntrega.tipo_entrega === "delivery") {
+    if (!esDireccionFloridaValida(datosEntrega.direccion_entrega)) {
+      console.log("Error: direccion de delivery invalida");
+      return {
+        success: false,
+        error: "Please enter a valid Florida delivery address with a zip code.",
+      };
+    }
+  } else {
+    const sedesActivas = await listarSedesActivas(supabase);
+    sedeElegida = sedesActivas.find((s) => s.id === datosEntrega.sede_id) ?? null;
+    if (!sedeElegida) {
+      console.log("Error: sede de retiro invalida o inactiva");
+      return {
+        success: false,
+        error: "Please choose a valid pickup location and try again.",
+      };
+    }
   }
 
   console.log("Intentando upsert clienta...");
@@ -146,8 +172,13 @@ export async function enviarPedido(
       modo,
       precio_total: total,
       notas: datosEntrega.detalles.trim() || undefined,
-      sede_nombre: sedeElegida.nombre,
-      sede_direccion: sedeElegida.direccion,
+      tipo_entrega: datosEntrega.tipo_entrega,
+      sede_nombre: sedeElegida?.nombre ?? undefined,
+      sede_direccion: sedeElegida?.direccion ?? undefined,
+      direccion_entrega:
+        datosEntrega.tipo_entrega === "delivery"
+          ? datosEntrega.direccion_entrega.trim()
+          : undefined,
     });
 
     console.log("Pedido creado:", pedido.id);
@@ -171,8 +202,8 @@ export async function enviarPedido(
       modo,
       comidas,
       total,
-      sedeElegida.nombre,
-      sedeElegida.direccion
+      sedeElegida?.nombre ?? null,
+      sedeElegida?.direccion ?? null
     );
     const whatsappUrl = `https://wa.me/${numeroNegocio}?text=${encodeURIComponent(mensaje)}`;
 

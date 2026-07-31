@@ -37,7 +37,7 @@ export function ComandaTicket({
   const diaLabel = DIAS_LABELS[pedido.dia_entrega] ?? pedido.dia_entrega;
 
   return (
-    <div className="print:break-inside-avoid">
+    <div className="print:break-inside-avoid print:[page-break-inside:avoid] print:mb-3">
       <div className="bg-white border-2 border-black rounded-xl overflow-hidden w-full">
         {/* Encabezado */}
         <div className="bg-black text-white flex items-center justify-between px-4 py-2.5">
@@ -70,19 +70,26 @@ export function ComandaTicket({
           <div className="w-[34%] p-3 space-y-2">
             <Campo label="Clienta" valor={pedido.clientas?.nombre ?? "—"} />
             <Campo label="Teléfono" valor={pedido.clientas?.telefono ?? "—"} />
-            <Campo
-              label="Retirar en"
-              valor={
-                pedido.sede_nombre
-                  ? `${pedido.sede_nombre} — ${pedido.sede_direccion ?? ""}`
-                  : "—"
-              }
-            />
+            {pedido.tipo_entrega === "delivery" ? (
+              <Campo
+                label="Entregar en"
+                valor={pedido.direccion_entrega ?? "—"}
+              />
+            ) : (
+              <Campo
+                label="Retirar en"
+                valor={
+                  pedido.sede_nombre
+                    ? `${pedido.sede_nombre} — ${pedido.sede_direccion ?? ""}`
+                    : "—"
+                }
+              />
+            )}
             {pedido.notas && <Campo label="Detalles" valor={pedido.notas} />}
 
             <div>
               <p className="text-[8px] font-bold uppercase tracking-wider text-black/50">
-                Retiro
+                {pedido.tipo_entrega === "delivery" ? "Delivery" : "Retiro"}
               </p>
               <span className="inline-block mt-1 bg-black text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
                 {diaLabel}

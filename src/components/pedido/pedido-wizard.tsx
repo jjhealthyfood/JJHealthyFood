@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   ChevronLeft,
   MapPin,
   Send,
   Clock,
   Leaf,
-  Store,
   Minus,
   Plus,
   Pencil,
+  CheckCircle2,
+  Star,
+  ChefHat,
+  Store,
+  Settings2,
 } from "lucide-react";
 import { Chip } from "./chip";
 import {
@@ -19,10 +23,18 @@ import {
   type ComidaSeleccionada,
   type DatosEntrega,
 } from "@/controllers/pedidos.actions";
-import type { DiaEntrega, ModoPedido, OpcionMenu, SedeRetiro } from "@/models/types";
+import type { DiaEntrega, ModoPedido, OpcionMenu, SedeRetiro, TipoEntrega } from "@/models/types";
 import type { ExtrasConfig } from "@/models/menu.model";
 
 const TELEFONO_US_REGEX = /^(\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}$/;
+const ZIP_FLORIDA_REGEX = /\b3[2-4]\d{3}\b/;
+const ESTADO_FLORIDA_REGEX = /\bFL\b|florida/i;
+
+function esDireccionFloridaValida(direccion: string): boolean {
+  const texto = direccion.trim();
+  if (texto.length < 10) return false;
+  return ESTADO_FLORIDA_REGEX.test(texto) && ZIP_FLORIDA_REGEX.test(texto);
+}
 
 type TipoComida = "regular" | "desayuno" | "plato";
 
@@ -224,6 +236,8 @@ export function PedidoWizard({
   const [sedeId, setSedeId] = useState(() =>
     sedes.length === 1 ? sedes[0].id : ""
   );
+  const [tipoEntrega, setTipoEntrega] = useState<TipoEntrega>("pickup");
+  const [direccionEntrega, setDireccionEntrega] = useState("");
   const [diaEntrega, setDiaEntrega] = useState<DiaEntrega | "">("");
   const [bienvenidaClienta, setBienvenidaClienta] = useState<string | null>(
     null
@@ -290,7 +304,9 @@ export function PedidoWizard({
         nombre.trim() &&
           telefono.trim() &&
           TELEFONO_US_REGEX.test(telefono.trim()) &&
-          sedeId &&
+          (tipoEntrega === "delivery"
+            ? esDireccionFloridaValida(direccionEntrega)
+            : sedeId) &&
           diaEntrega
       );
     }
@@ -325,7 +341,13 @@ export function PedidoWizard({
   );
 
   function enviar() {
-    if (!diaEntrega || !sedeId) return;
+    if (!diaEntrega) return;
+    if (
+      tipoEntrega === "delivery"
+        ? !esDireccionFloridaValida(direccionEntrega)
+        : !sedeId
+    )
+      return;
     setError(null);
 
     // Open the tab right away (synchronously, inside the click) so the
@@ -338,7 +360,9 @@ export function PedidoWizard({
       telefono: telefono.trim(),
       detalles: detalles.trim(),
       dia_entrega: diaEntrega,
+      tipo_entrega: tipoEntrega,
       sede_id: sedeId,
+      direccion_entrega: direccionEntrega.trim(),
     };
 
     const comidasSeleccionadas: ComidaSeleccionada[] = comidasActivas.map(
@@ -446,6 +470,8 @@ export function PedidoWizard({
             bienvenidaClienta={bienvenidaClienta}
             sedes={sedes}
             sedeId={sedeId}
+            tipoEntrega={tipoEntrega}
+            direccionEntrega={direccionEntrega}
             forzarProximaSemana={forzarProximaSemana}
             onNombreChange={setNombre}
             onTelefonoChange={setTelefono}
@@ -453,6 +479,8 @@ export function PedidoWizard({
             onDetallesChange={setDetalles}
             onDiaChange={setDiaEntrega}
             onSedeChange={setSedeId}
+            onTipoEntregaChange={setTipoEntrega}
+            onDireccionEntregaChange={setDireccionEntrega}
           />
         )}
 
@@ -466,6 +494,8 @@ export function PedidoWizard({
             detalles={detalles}
             diaEntrega={diaEntrega}
             sede={sedes.find((s) => s.id === sedeId) ?? null}
+            tipoEntrega={tipoEntrega}
+            direccionEntrega={direccionEntrega}
             total={total}
             onEditarPaso={setPaso}
             extrasConfig={extrasConfig}
@@ -765,7 +795,7 @@ function PasoComida({
                     type="button"
                     onClick={() =>
                       onCambiar({
-                        gramosProteina: Math.max(0, comida.gramosProteina - 25),
+                        gramosProteina: Math.max(0, comida.gramosProteina - 5),
                       })
                     }
                     className="w-8 h-8 rounded-full border border-outline-variant text-on-surface-variant flex items-center justify-center hover:bg-surface-container-highest active:scale-95 transition-all"
@@ -780,7 +810,7 @@ function PasoComida({
                     type="button"
                     onClick={() =>
                       onCambiar({
-                        gramosProteina: comida.gramosProteina + 25,
+                        gramosProteina: comida.gramosProteina + 5,
                       })
                     }
                     className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center hover:opacity-90 active:scale-95 transition-all"
@@ -801,7 +831,7 @@ function PasoComida({
                     type="button"
                     onClick={() =>
                       onCambiar({
-                        gramosCarbohidrato: Math.max(0, comida.gramosCarbohidrato - 25),
+                        gramosCarbohidrato: Math.max(0, comida.gramosCarbohidrato - 5),
                       })
                     }
                     className="w-8 h-8 rounded-full border border-outline-variant text-on-surface-variant flex items-center justify-center hover:bg-surface-container-highest active:scale-95 transition-all"
@@ -816,7 +846,7 @@ function PasoComida({
                     type="button"
                     onClick={() =>
                       onCambiar({
-                        gramosCarbohidrato: comida.gramosCarbohidrato + 25,
+                        gramosCarbohidrato: comida.gramosCarbohidrato + 5,
                       })
                     }
                     className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center hover:opacity-90 active:scale-95 transition-all"
@@ -948,7 +978,7 @@ function PasoComida({
                     type="button"
                     onClick={() =>
                       onCambiar({
-                        gramosProteina: Math.max(0, comida.gramosProteina - 25),
+                        gramosProteina: Math.max(0, comida.gramosProteina - 5),
                       })
                     }
                     className="w-8 h-8 rounded-full border border-outline-variant text-on-surface-variant flex items-center justify-center hover:bg-surface-container-highest active:scale-95 transition-all"
@@ -963,7 +993,7 @@ function PasoComida({
                     type="button"
                     onClick={() =>
                       onCambiar({
-                        gramosProteina: comida.gramosProteina + 25,
+                        gramosProteina: comida.gramosProteina + 5,
                       })
                     }
                     className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center hover:opacity-90 active:scale-95 transition-all"
@@ -984,7 +1014,7 @@ function PasoComida({
                     type="button"
                     onClick={() =>
                       onCambiar({
-                        gramosCarbohidrato: Math.max(0, comida.gramosCarbohidrato - 25),
+                        gramosCarbohidrato: Math.max(0, comida.gramosCarbohidrato - 5),
                       })
                     }
                     className="w-8 h-8 rounded-full border border-outline-variant text-on-surface-variant flex items-center justify-center hover:bg-surface-container-highest active:scale-95 transition-all"
@@ -999,7 +1029,7 @@ function PasoComida({
                     type="button"
                     onClick={() =>
                       onCambiar({
-                        gramosCarbohidrato: comida.gramosCarbohidrato + 25,
+                        gramosCarbohidrato: comida.gramosCarbohidrato + 5,
                       })
                     }
                     className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center hover:opacity-90 active:scale-95 transition-all"
@@ -1126,6 +1156,8 @@ function PasoEntrega({
   bienvenidaClienta,
   sedes,
   sedeId,
+  tipoEntrega,
+  direccionEntrega,
   forzarProximaSemana,
   onNombreChange,
   onTelefonoChange,
@@ -1133,6 +1165,8 @@ function PasoEntrega({
   onDetallesChange,
   onDiaChange,
   onSedeChange,
+  onTipoEntregaChange,
+  onDireccionEntregaChange,
 }: {
   nombre: string;
   telefono: string;
@@ -1141,6 +1175,8 @@ function PasoEntrega({
   bienvenidaClienta: string | null;
   sedes: SedeRetiro[];
   sedeId: string;
+  tipoEntrega: TipoEntrega;
+  direccionEntrega: string;
   forzarProximaSemana: boolean;
   onNombreChange: (v: string) => void;
   onTelefonoChange: (v: string) => void;
@@ -1148,6 +1184,8 @@ function PasoEntrega({
   onDetallesChange: (v: string) => void;
   onDiaChange: (v: DiaEntrega) => void;
   onSedeChange: (v: string) => void;
+  onTipoEntregaChange: (v: TipoEntrega) => void;
+  onDireccionEntregaChange: (v: string) => void;
 }) {
   const telefonoInvalido =
     telefono.trim().length > 0 && !TELEFONO_US_REGEX.test(telefono.trim());
@@ -1157,10 +1195,10 @@ function PasoEntrega({
     <div className="space-y-6">
       <div>
         <h2 className="font-display text-2xl font-semibold text-on-surface">
-          Pickup details
+          {tipoEntrega === "delivery" ? "Delivery details" : "Pickup details"}
         </h2>
         <p className="text-on-surface-variant font-sans text-sm mt-1">
-          We need these to coordinate your pickup.
+          We need these to coordinate your {tipoEntrega === "delivery" ? "delivery" : "pickup"}.
         </p>
       </div>
 
@@ -1170,7 +1208,54 @@ function PasoEntrega({
         </p>
       )}
 
-      {sedes.length > 1 ? (
+      <div className="flex gap-1 bg-surface-container rounded-xl p-1">
+        <button
+          type="button"
+          onClick={() => onTipoEntregaChange("pickup")}
+          className={`flex-1 py-2.5 px-3 rounded-lg font-sans text-sm font-semibold transition-colors ${
+            tipoEntrega === "pickup"
+              ? "bg-primary text-on-primary"
+              : "text-on-surface-variant hover:bg-surface-container-high"
+          }`}
+        >
+          Pickup
+        </button>
+        <button
+          type="button"
+          onClick={() => onTipoEntregaChange("delivery")}
+          className={`flex-1 py-2.5 px-3 rounded-lg font-sans text-sm font-semibold transition-colors ${
+            tipoEntrega === "delivery"
+              ? "bg-primary text-on-primary"
+              : "text-on-surface-variant hover:bg-surface-container-high"
+          }`}
+        >
+          Delivery
+        </button>
+      </div>
+
+      {tipoEntrega === "delivery" ? (
+        <div className="space-y-2">
+          <label className="font-sans text-xs font-bold text-on-surface-variant uppercase">
+            Delivery address
+          </label>
+          <textarea
+            value={direccionEntrega}
+            onChange={(e) => onDireccionEntregaChange(e.target.value)}
+            placeholder="123 Main St, Orlando, FL 32801"
+            rows={2}
+            className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant rounded-xl font-sans focus:ring-2 focus:ring-primary outline-none resize-none"
+          />
+          <p className="text-xs text-on-surface-variant font-sans">
+            We currently only deliver within Florida.
+          </p>
+          {direccionEntrega.trim().length > 0 &&
+            !esDireccionFloridaValida(direccionEntrega) && (
+              <p className="text-xs text-error font-sans">
+                Please enter a full Florida address with a valid FL zip code.
+              </p>
+            )}
+        </div>
+      ) : sedes.length > 1 ? (
         <div className="space-y-2">
           <label className="font-sans text-xs font-bold text-on-surface-variant uppercase">
             Pickup location
@@ -1245,7 +1330,7 @@ function PasoEntrega({
         <textarea
           value={detalles}
           onChange={(e) => onDetallesChange(e.target.value)}
-          placeholder="Anything we should know about your pickup?"
+          placeholder={`Anything we should know about your ${tipoEntrega === "delivery" ? "delivery" : "pickup"}?`}
           rows={2}
           className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant rounded-xl font-sans focus:ring-2 focus:ring-primary outline-none resize-none"
         />
@@ -1253,7 +1338,7 @@ function PasoEntrega({
 
       <div className="space-y-2">
         <label className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-          Pickup day
+          {tipoEntrega === "delivery" ? "Delivery day" : "Pickup day"}
         </label>
         {forzarProximaSemana && (
           <p className="text-xs text-secondary font-sans font-semibold bg-secondary/10 rounded-lg px-3 py-1.5">
@@ -1286,6 +1371,8 @@ function PasoResumen({
   detalles,
   diaEntrega,
   sede,
+  tipoEntrega,
+  direccionEntrega,
   total,
   onEditarPaso,
   extrasConfig,
@@ -1302,6 +1389,8 @@ function PasoResumen({
   detalles: string;
   diaEntrega: DiaEntrega | "";
   sede: SedeRetiro | null;
+  tipoEntrega: TipoEntrega;
+  direccionEntrega: string;
   total: number;
   onEditarPaso: (paso: number) => void;
   extrasConfig?: ExtrasConfig;
@@ -1374,14 +1463,22 @@ function PasoResumen({
         className="w-full text-left bg-surface-container-lowest border border-outline-variant rounded-xl p-4 hover:border-primary transition-colors"
       >
         <p className="font-sans text-xs font-bold text-secondary uppercase mb-1 flex items-center gap-1.5">
-          Pickup
+          {tipoEntrega === "delivery" ? "Delivery" : "Pickup"}
           <Pencil size={11} className="opacity-60" />
         </p>
         <p className="font-sans text-sm text-on-surface">{nombre}</p>
-        {sede && (
-          <p className="font-sans text-sm text-on-surface-variant">
-            {sede.direccion}
-          </p>
+        {tipoEntrega === "delivery" ? (
+          direccionEntrega && (
+            <p className="font-sans text-sm text-on-surface-variant">
+              {direccionEntrega}
+            </p>
+          )
+        ) : (
+          sede && (
+            <p className="font-sans text-sm text-on-surface-variant">
+              {sede.direccion}
+            </p>
+          )
         )}
         {detalles && (
           <p className="font-sans text-sm text-on-surface-variant italic">
