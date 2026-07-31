@@ -46,7 +46,7 @@ export function ResumenCocina({ pedidos }: { pedidos: PedidoParaComanda[] }) {
           {resumen.map((r) => (
             <li
               key={r.descripcion}
-              className="flex items-center gap-3 px-4 py-2.5"
+              className="flex items-center gap-3 px-4 py-2.5 print:break-inside-avoid print:[page-break-inside:avoid]"
             >
               <span className="shrink-0 w-8 h-8 rounded-full bg-black text-white text-sm font-bold flex items-center justify-center">
                 {r.cantidad}
