@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState, useTransition } from "react";
 import {
   ChevronLeft,
@@ -402,7 +403,12 @@ export function PedidoWizard({
   }
 
   if (!iniciado) {
-    return <IntroScreen onComenzar={() => setIniciado(true)} />;
+    return (
+      <IntroScreen
+        onComenzar={() => setIniciado(true)}
+        opcionesDesayuno={opcionesDesayuno}
+      />
+    );
   }
 
   return (
@@ -1494,65 +1500,489 @@ function PasoResumen({
   );
 }
 
-function IntroScreen({ onComenzar }: { onComenzar: () => void }) {
+function IconoInstagram({ size = 20 }: { size?: number }) {
   return (
-    <main className="min-h-screen bg-primary flex flex-col relative overflow-hidden">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=900&q=80"
-        alt=""
-        className="absolute inset-0 w-full h-full object-cover opacity-80"
-      />
-      <div className="absolute inset-0 bg-gradient-to-b from-primary/80 via-primary/55 to-primary/85" />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
+  );
+}
 
-      <div className="relative z-10 flex-1 flex flex-col justify-center px-6 py-16 max-w-lg mx-auto text-center">
-        <div className="w-20 h-20 mx-auto rounded-2xl bg-white flex items-center justify-center mb-6 overflow-hidden">
+const CARRUSEL_PLATOS = [
+  { nombre: "Egg Wrap with Turkey Bacon & Fruit", src: "/carrusel/desayuno-huevo-tocino-fruta.jpeg" },
+  { nombre: "Ground Beef, Broccoli & Sweet Potato Mash", src: "/carrusel/carne-molida-brocoli-batata.jpeg" },
+  { nombre: "Teriyaki Chicken Bowl", src: "/carrusel/pollo-teriyaki-arroz-edamame.jpeg" },
+  { nombre: "Stuffed Plantain (Canoa)", src: "/carrusel/canoa-carne-queso.jpeg" },
+  { nombre: "Chicken, Zucchini & Yuca", src: "/carrusel/pollo-yuca-zucchini.jpeg" },
+  { nombre: "Ground Beef, Pasta & Plantain", src: "/carrusel/carne-molida-pasta-platano.jpeg" },
+  { nombre: "Beef Strips, Yuca & Green Beans", src: "/carrusel/res-yuca-vainitas.jpeg" },
+  { nombre: "Mexican Bowl", src: "/carrusel/mexican-bowl.jpeg" },
+];
+
+const PLATOS_DUPLICADOS = [...CARRUSEL_PLATOS, ...CARRUSEL_PLATOS];
+
+function CarruselComidas() {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startScrollRef = useRef(0);
+  const distanciaRef = useRef(0);
+  const pausadoHastaRef = useRef(0);
+  const [seleccionado, setSeleccionado] = useState<number | null>(null);
+
+  useEffect(() => {
+    const prefiereMenosMovimiento = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    if (prefiereMenosMovimiento) return;
+
+    let raf: number;
+    function tick() {
+      const el = scrollRef.current;
+      const now = performance.now();
+      if (
+        el &&
+        !draggingRef.current &&
+        seleccionado === null &&
+        now > pausadoHastaRef.current
+      ) {
+        el.scrollLeft += 0.7;
+        const mitad = el.scrollWidth / 2;
+        if (el.scrollLeft >= mitad) {
+          el.scrollLeft -= mitad;
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [seleccionado]);
+
+  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    const el = scrollRef.current;
+    if (!el) return;
+    draggingRef.current = true;
+    distanciaRef.current = 0;
+    startXRef.current = e.clientX;
+    startScrollRef.current = el.scrollLeft;
+    el.setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!draggingRef.current) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const dx = e.clientX - startXRef.current;
+    distanciaRef.current = Math.abs(dx);
+    el.scrollLeft = startScrollRef.current - dx;
+  }
+
+  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
+    draggingRef.current = false;
+    pausadoHastaRef.current = performance.now() + 800;
+    if (distanciaRef.current < 6) {
+      const target = (e.target as HTMLElement).closest("[data-idx]");
+      const idx = target ? Number(target.getAttribute("data-idx")) : null;
+      setSeleccionado((actual) => (actual === idx ? null : idx));
+    }
+  }
+
+  return (
+    <div className="overflow-hidden -mx-6">
+      <div
+        ref={scrollRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        className="no-scrollbar flex gap-6 overflow-x-auto px-6 cursor-grab active:cursor-grabbing select-none"
+      >
+        {PLATOS_DUPLICADOS.map((plato, i) => {
+          const activo = seleccionado === i;
+          return (
+            <div
+              key={i}
+              data-idx={i}
+              className="group flex flex-col items-center shrink-0 w-44 md:w-56"
+            >
+              <div
+                className={`relative w-44 h-44 md:w-56 md:h-56 rounded-full overflow-hidden shadow-md transition-transform duration-300 ease-out ${
+                  activo
+                    ? "scale-110 -translate-y-2"
+                    : "group-hover:scale-110 group-hover:-translate-y-2"
+                }`}
+              >
+                <Image
+                  src={plato.src}
+                  alt={plato.nombre}
+                  fill
+                  draggable={false}
+                  sizes="(min-width: 768px) 224px, 176px"
+                  className="object-cover pointer-events-none"
+                />
+                <div
+                  className={`absolute inset-0 transition-colors flex items-center justify-center ${
+                    activo ? "bg-black/40" : "bg-black/0 group-hover:bg-black/40"
+                  }`}
+                >
+                  <span
+                    className={`font-sans text-xs font-semibold text-white text-center px-3 transition-opacity ${
+                      activo ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    }`}
+                  >
+                    {plato.nombre}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const CICLO_TINTE = [
+  "bg-primary-fixed text-on-primary-fixed-variant",
+  "bg-secondary-fixed text-on-secondary-fixed-variant",
+  "bg-tertiary-fixed text-on-tertiary-fixed-variant",
+];
+
+const CICLO_SOLIDO = [
+  "bg-primary text-on-primary",
+  "bg-secondary text-on-secondary",
+  "bg-tertiary text-on-tertiary",
+];
+
+const BADGES_CONFIANZA = [
+  "Freshly prepared each week",
+  "Fully customizable",
+  "Never frozen",
+  "Pickup or delivery",
+];
+
+const PASOS_COMO_FUNCIONA = [
+  {
+    titulo: "Pick your meals",
+    descripcion:
+      "Build your order: choose how many meals you want and customize protein, carb, and veggie in each one.",
+  },
+  {
+    titulo: "Add extras if you want",
+    descripcion: "Add an extra protein, carb, or veggie to any meal.",
+  },
+  {
+    titulo: "Choose pickup or delivery",
+    descripcion:
+      "Pick a pickup spot or enter your delivery address, for Sunday or Monday. Orders are open Tuesday through Friday 6pm for that week.",
+  },
+  {
+    titulo: "Confirm on WhatsApp & you're set",
+    descripcion:
+      "We send your confirmation instantly. Grab it at your pickup spot, or we'll bring it to you.",
+  },
+];
+
+const RAZONES_ELEGIRNOS = [
+  {
+    icono: Leaf,
+    titulo: "Always Fresh, Never Frozen",
+    descripcion: "Every meal is cooked fresh for pickup — no freezers, no shortcuts.",
+  },
+  {
+    icono: ChefHat,
+    titulo: "New Menu Weekly",
+    descripcion: "Proteins, carbs, and veggies rotate regularly, so it never gets boring.",
+  },
+  {
+    icono: Store,
+    titulo: "Pickup or Delivery, Your Choice",
+    descripcion: "Swing by your nearest pickup spot, or have it delivered straight to your door.",
+  },
+  {
+    icono: Settings2,
+    titulo: "Fully Customizable",
+    descripcion: "Build every meal your way, with optional extras priced individually.",
+  },
+];
+
+const TESTIMONIOS = [
+  {
+    nombre: "Valeria Rojas",
+    usuario: "@valeriarojasfit",
+    texto: "Que delicia. Las comidas de esta semana estaaann 🔥🔥🔥",
+  },
+  {
+    nombre: "Carlos López",
+    usuario: null,
+    texto:
+      "Demasiado ricas las comidas! A mí y a mi esposa nos hace la vida más fácil 🙏",
+  },
+  {
+    nombre: "Lina G.",
+    usuario: null,
+    texto:
+      "Thanks for everything, I love how healthy and delicious I can eat for my lunches 👍",
+  },
+];
+
+function IntroScreen({
+  onComenzar,
+  opcionesDesayuno = [],
+}: {
+  onComenzar: () => void;
+  opcionesDesayuno?: OpcionMenu[];
+}) {
+  const nombresDesayuno = opcionesDesayuno.length
+    ? opcionesDesayuno.map((o) => o.nombre)
+    : ["Waffles", "Waffles + Eggs", "Waffles + Blackberry", "Waffles + Egg & Turkey Bacon"];
+
+  return (
+    <main className="min-h-screen bg-surface flex flex-col">
+      {/* Hero + carousel */}
+      <section className="bg-gradient-to-b from-primary-fixed/40 via-surface to-surface px-6 pt-14 pb-10 text-center">
+        <div className="w-20 h-20 mx-auto rounded-2xl bg-white flex items-center justify-center mb-5 overflow-hidden shadow-sm">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="JJ Healthy Food" className="w-16 h-16 object-contain" />
         </div>
 
-        <p className="text-secondary-container font-sans text-xs font-bold uppercase tracking-widest mb-3">
+        <p className="text-secondary font-sans text-sm font-bold uppercase tracking-widest mb-3">
           JJ Healthy Food
         </p>
-        <h1 className="font-display text-3xl md:text-4xl font-semibold text-white text-balance mb-4">
+        <h1 className="font-display text-3xl md:text-4xl font-semibold text-on-surface text-balance mb-4 max-w-2xl mx-auto">
           Build your healthy meal week in minutes
         </h1>
-        <p className="font-sans text-white/80 text-base mb-10">
-          We save you time and effort: pick your meals, choose a pickup day,
-          and swing by to grab your order.
+        <p className="font-sans text-on-surface-variant text-base mb-6 max-w-lg mx-auto">
+          We save you time and effort: pick your meals, then choose pickup or
+          delivery on the day that works for you.
         </p>
 
-        <div className="grid grid-cols-3 gap-3 mb-10">
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center">
-              <Clock className="text-white" size={20} />
-            </div>
-            <span className="font-sans text-xs text-white/70">Fast</span>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center">
-              <Leaf className="text-white" size={20} />
-            </div>
-            <span className="font-sans text-xs text-white/70">Healthy</span>
-          </div>
-          <div className="flex flex-col items-center gap-2">
-            <div className="w-11 h-11 rounded-full bg-white/15 flex items-center justify-center">
-              <Store className="text-white" size={20} />
-            </div>
-            <span className="font-sans text-xs text-white/70">
-              Easy pickup
+        <div className="flex flex-wrap justify-center gap-2 mb-10">
+          {BADGES_CONFIANZA.map((badge, i) => (
+            <span
+              key={badge}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-sans text-xs font-semibold ${CICLO_TINTE[i % CICLO_TINTE.length]}`}
+            >
+              <CheckCircle2 size={13} />
+              {badge}
             </span>
-          </div>
+          ))}
         </div>
 
         <button
           type="button"
           onClick={onComenzar}
-          className="bg-secondary text-on-secondary py-4 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
+          className="bg-secondary text-on-secondary px-8 py-4 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all mb-12"
         >
           Start my order
         </button>
-      </div>
+
+        <CarruselComidas />
+      </section>
+
+      {/* How it works */}
+      <section className="px-6 py-14 max-w-3xl mx-auto w-full">
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-on-surface text-center mb-2">
+          How it works
+        </h2>
+        <p className="font-sans text-on-surface-variant text-center mb-8">
+          A simple process to get fresh, healthy meals ready for you.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {PASOS_COMO_FUNCIONA.map((paso, i) => (
+            <div
+              key={paso.titulo}
+              className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5"
+            >
+              <div
+                className={`w-9 h-9 rounded-full flex items-center justify-center font-display font-semibold mb-3 ${CICLO_SOLIDO[i % CICLO_SOLIDO.length]}`}
+              >
+                {i + 1}
+              </div>
+              <h3 className="font-sans font-semibold text-on-surface mb-1">
+                {paso.titulo}
+              </h3>
+              <p className="font-sans text-sm text-on-surface-variant">
+                {paso.descripcion}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Breakfast spotlight */}
+      <section className="bg-secondary-fixed/35 px-6 py-14">
+        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+          <div>
+            <span className="inline-block bg-secondary text-on-secondary font-sans text-xs font-bold uppercase tracking-widest mb-3 px-3 py-1 rounded-full">
+              Breakfast
+            </span>
+            <h2 className="font-display text-2xl md:text-3xl font-semibold text-on-surface mb-3">
+              Start your day right
+            </h2>
+            <p className="font-sans text-on-surface-variant mb-5">
+              Choose from our rotating breakfast menu — classic waffles paired
+              with eggs, fruit, or turkey bacon, made fresh for pickup.
+            </p>
+            <div className="flex flex-wrap gap-2 mb-6">
+              {nombresDesayuno.map((nombre) => (
+                <span
+                  key={nombre}
+                  className="bg-surface-container-lowest border border-outline-variant rounded-full px-3 py-1.5 font-sans text-xs font-medium text-on-surface"
+                >
+                  {nombre}
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={onComenzar}
+              className="bg-secondary text-on-secondary px-6 py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
+            >
+              Start my order
+            </button>
+          </div>
+          <div className="relative rounded-3xl overflow-hidden shadow-md aspect-[4/5] max-h-[420px] mx-auto w-full max-w-sm">
+            <Image
+              src="/carrusel/waffle.jpg"
+              alt="Waffles breakfast plate"
+              fill
+              sizes="(min-width: 768px) 384px, 100vw"
+              className="object-cover object-bottom"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* Why choose us */}
+      <section className="px-6 py-14 max-w-5xl mx-auto w-full">
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-on-surface text-center mb-10">
+          Why choose us
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+          <div>
+            <h3 className="font-display text-3xl font-semibold text-on-surface mb-3">
+              The JJ Difference
+            </h3>
+            <p className="font-sans text-on-surface-variant">
+              At JJ Healthy Food, eating well shouldn&apos;t mean giving up
+              flavor or convenience. Every meal is prepared fresh, portioned
+              to your goals, and ready when you are — no subscriptions, no
+              commitments, just great food on your schedule.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {RAZONES_ELEGIRNOS.map((razon, i) => (
+              <div
+                key={razon.titulo}
+                className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-4"
+              >
+                <div
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${CICLO_TINTE[i % CICLO_TINTE.length]}`}
+                >
+                  <razon.icono size={18} />
+                </div>
+                <h4 className="font-sans font-semibold text-on-surface text-sm mb-1">
+                  {razon.titulo}
+                </h4>
+                <p className="font-sans text-xs text-on-surface-variant">
+                  {razon.descripcion}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="bg-primary-fixed/30 px-6 py-14">
+        <h2 className="font-display text-2xl md:text-3xl font-semibold text-on-surface text-center mb-8">
+          What our customers say
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+          {TESTIMONIOS.map((t, i) => (
+            <div
+              key={t.nombre}
+              className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center font-sans font-semibold shrink-0 ${CICLO_SOLIDO[i % CICLO_SOLIDO.length]}`}
+                >
+                  {t.nombre[0]}
+                </div>
+                <div>
+                  <p className="font-sans text-sm font-semibold text-on-surface">
+                    {t.nombre}
+                  </p>
+                  {t.usuario && (
+                    <p className="font-sans text-xs text-on-surface-variant">
+                      {t.usuario}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-0.5 mb-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    size={14}
+                    className="fill-secondary-container text-secondary-container"
+                  />
+                ))}
+              </div>
+              <p className="font-sans text-sm text-on-surface-variant">
+                {t.texto}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="px-6 py-12 text-center">
+        <button
+          type="button"
+          onClick={onComenzar}
+          className="bg-secondary text-on-secondary px-8 py-4 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
+        >
+          Start my order
+        </button>
+      </section>
+
+      {/* Footer */}
+      <footer className="mt-auto bg-primary px-6 py-8">
+        <div className="max-w-lg mx-auto flex flex-col items-center gap-3 text-center">
+          <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="JJ Healthy Food" className="w-9 h-9 object-contain" />
+          </div>
+          <p className="font-display text-white font-semibold">JJ Healthy Food</p>
+          <a
+            href="https://instagram.com/jjhealthyfood13"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-white/80 font-sans text-base hover:text-white transition-colors"
+          >
+            <IconoInstagram size={22} />
+            jjhealthyfood13
+          </a>
+          <p className="font-sans text-white/50 text-xs mt-2">
+            © {new Date().getFullYear()} JJ Healthy Food. All rights reserved.
+          </p>
+        </div>
+      </footer>
     </main>
   );
 }
