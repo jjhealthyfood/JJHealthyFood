@@ -1533,23 +1533,26 @@ const CARRUSEL_PLATOS = [
 const PLATOS_DUPLICADOS = [...CARRUSEL_PLATOS, ...CARRUSEL_PLATOS];
 
 function CarruselComidas() {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const offsetRef = useRef(0);
   const draggingRef = useRef(false);
   const startXRef = useRef(0);
-  const startScrollRef = useRef(0);
+  const startOffsetRef = useRef(0);
   const distanciaRef = useRef(0);
   const pausadoHastaRef = useRef(0);
   const [seleccionado, setSeleccionado] = useState<number | null>(null);
 
-  useEffect(() => {
-    const prefiereMenosMovimiento = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-    if (prefiereMenosMovimiento) return;
+  function normalizar(offset: number, mitad: number) {
+    if (mitad <= 0) return offset;
+    let o = offset % mitad;
+    if (o > 0) o -= mitad;
+    return o;
+  }
 
+  useEffect(() => {
     let raf: number;
     function tick() {
-      const el = scrollRef.current;
+      const el = trackRef.current;
       const now = performance.now();
       if (
         el &&
@@ -1557,11 +1560,9 @@ function CarruselComidas() {
         seleccionado === null &&
         now > pausadoHastaRef.current
       ) {
-        el.scrollLeft += 0.7;
         const mitad = el.scrollWidth / 2;
-        if (el.scrollLeft >= mitad) {
-          el.scrollLeft -= mitad;
-        }
+        offsetRef.current = normalizar(offsetRef.current - 0.7, mitad);
+        el.style.transform = `translateX(${offsetRef.current}px)`;
       }
       raf = requestAnimationFrame(tick);
     }
@@ -1570,22 +1571,22 @@ function CarruselComidas() {
   }, [seleccionado]);
 
   function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    const el = scrollRef.current;
-    if (!el) return;
     draggingRef.current = true;
     distanciaRef.current = 0;
     startXRef.current = e.clientX;
-    startScrollRef.current = el.scrollLeft;
-    el.setPointerCapture(e.pointerId);
+    startOffsetRef.current = offsetRef.current;
+    e.currentTarget.setPointerCapture(e.pointerId);
   }
 
   function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     if (!draggingRef.current) return;
-    const el = scrollRef.current;
+    const el = trackRef.current;
     if (!el) return;
     const dx = e.clientX - startXRef.current;
     distanciaRef.current = Math.abs(dx);
-    el.scrollLeft = startScrollRef.current - dx;
+    const mitad = el.scrollWidth / 2;
+    offsetRef.current = normalizar(startOffsetRef.current + dx, mitad);
+    el.style.transform = `translateX(${offsetRef.current}px)`;
   }
 
   function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
@@ -1599,14 +1600,18 @@ function CarruselComidas() {
   }
 
   return (
-    <div className="overflow-hidden -mx-6">
+    <div
+      className="overflow-hidden -mx-6"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      style={{ touchAction: "pan-y" }}
+    >
       <div
-        ref={scrollRef}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        className="no-scrollbar flex gap-6 overflow-x-auto px-6 cursor-grab active:cursor-grabbing select-none"
+        ref={trackRef}
+        className="flex gap-6 w-max px-6 cursor-grab active:cursor-grabbing select-none"
+        style={{ willChange: "transform" }}
       >
         {PLATOS_DUPLICADOS.map((plato, i) => {
           const activo = seleccionado === i;
