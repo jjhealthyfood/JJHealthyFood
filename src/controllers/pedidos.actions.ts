@@ -1,5 +1,6 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { crearPedido } from "@/models/pedidos.model";
 import { crearComidasPedido } from "@/models/comidas-pedido.model";
@@ -27,7 +28,7 @@ export type ClientaEncontrada = {
 
 export type ResultadoEnvioPedido =
   | { success: true; whatsappUrl: string }
-  | { success: false; error: string };
+  | { success: false; error: string; esDuplicado?: boolean };
 
 const ZIP_FLORIDA_REGEX = /\b3[2-4]\d{3}\b/;
 const ESTADO_FLORIDA_REGEX = /\bFL\b|florida/i;
@@ -44,6 +45,62 @@ function formatearMoneda(valor: number) {
     currency: "USD",
     minimumFractionDigits: 2,
   }).format(valor);
+}
+
+type FirmaComida = {
+  proteina: string;
+  carbohidrato: string | null;
+  vegetal: string | null;
+  extra: string | null;
+  gramos_proteina: number | string | null;
+  gramos_carbohidrato: number | string | null;
+  es_desayuno: boolean;
+};
+
+function firmaComida(c: FirmaComida): string {
+  const gp =
+    c.gramos_proteina === null || c.gramos_proteina === undefined
+      ? ""
+      : String(Number(c.gramos_proteina));
+  const gc =
+    c.gramos_carbohidrato === null || c.gramos_carbohidrato === undefined
+      ? ""
+      : String(Number(c.gramos_carbohidrato));
+  return [c.proteina, c.carbohidrato ?? "", c.vegetal ?? "", c.extra ?? "", gp, gc, c.es_desayuno].join("|");
+}
+
+async function esPedidoDuplicado(
+  supabase: SupabaseClient,
+  clientaId: string,
+  diaEntrega: DiaEntrega,
+  comidasNuevas: ComidaSeleccionada[]
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("comidas_pendientes_de_clienta_dia", {
+    p_clienta_id: clientaId,
+    p_dia_entrega: diaEntrega,
+  });
+
+  if (error || !data) return false;
+
+  const porPedido = new Map<string, string[]>();
+  for (const fila of data as (FirmaComida & { pedido_id: string })[]) {
+    const lista = porPedido.get(fila.pedido_id) ?? [];
+    lista.push(firmaComida(fila));
+    porPedido.set(fila.pedido_id, lista);
+  }
+
+  const firmasNuevas = comidasNuevas.map(firmaComida).sort();
+
+  for (const firmas of porPedido.values()) {
+    const ordenadas = [...firmas].sort();
+    if (
+      ordenadas.length === firmasNuevas.length &&
+      ordenadas.every((f, i) => f === firmasNuevas[i])
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function buscarClientaPorTelefono(
@@ -81,7 +138,8 @@ function construirMensajeWhatsapp(
         modo === "macro" && !c.es_desayuno && c.gramos_proteina !== null
           ? ` (${c.gramos_proteina}g / ${c.gramos_carbohidrato}g)`
           : "";
-      return `*Meal ${c.numero_comida}:* ${base}${extra}${gramos} — ${formatearMoneda(c.precio)}`;
+      const nota = c.comentario ? `\n   _Note: ${c.comentario}_` : "";
+      return `*Meal ${c.numero_comida}:* ${base}${extra}${gramos} — ${formatearMoneda(c.precio)}${nota}`;
     })
     .join("\n");
 
@@ -106,7 +164,8 @@ function construirMensajeWhatsapp(
 export async function enviarPedido(
   datosEntrega: DatosEntrega,
   modo: ModoPedido,
-  comidas: ComidaSeleccionada[]
+  comidas: ComidaSeleccionada[],
+  confirmarDuplicado = false
 ): Promise<ResultadoEnvioPedido> {
   console.log("=== INICIO ENVIAR PEDIDO ===");
   console.log("Datos entrega:", datosEntrega);
@@ -159,6 +218,23 @@ export async function enviarPedido(
   if (clientaError || !clientaId) {
     console.log("Error en upsert:", clientaError);
     return { success: false, error: "We couldn't save your details. Please try again." };
+  }
+
+  if (!confirmarDuplicado) {
+    const duplicado = await esPedidoDuplicado(
+      supabase,
+      clientaId as string,
+      datosEntrega.dia_entrega,
+      comidas
+    );
+    if (duplicado) {
+      console.log("Posible pedido duplicado detectado");
+      return {
+        success: false,
+        error: "This looks like a duplicate order.",
+        esDuplicado: true,
+      };
+    }
   }
 
   try {

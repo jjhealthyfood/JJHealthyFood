@@ -25,6 +25,7 @@ export type Pedido = {
   sede_nombre: string | null;
   sede_direccion: string | null;
   direccion_entrega: string | null;
+  entregado_en: string | null;
 };
 
 export type SedeRetiro = {
@@ -47,6 +48,7 @@ export type ComidaPedido = {
   gramos_carbohidrato: number | null;
   precio: number;
   es_desayuno: boolean;
+  comentario: string | null;
 };
 
 export type PedidoConDetalle = Pedido & {

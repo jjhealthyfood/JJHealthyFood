@@ -16,6 +16,8 @@ import {
   ChefHat,
   Store,
   Settings2,
+  AlertTriangle,
+  ChevronDown,
 } from "lucide-react";
 import { Chip } from "./chip";
 import {
@@ -49,6 +51,7 @@ type ComidaSlot = {
   gramosCarbohidrato: number;
   extraActivo: boolean;
   extraValor: string;
+  comentario: string;
 };
 
 const comidaVacia: ComidaSlot = {
@@ -61,6 +64,7 @@ const comidaVacia: ComidaSlot = {
   gramosCarbohidrato: 100,
   extraActivo: false,
   extraValor: "",
+  comentario: "",
 };
 
 function formatearMoneda(valor: number) {
@@ -205,6 +209,83 @@ function etiquetaPaso(paso: number, cantidad: number) {
   return "Summary";
 }
 
+function descripcionCorta(
+  slot: ComidaSlot,
+  proteinas: OpcionMenu[],
+  platos: OpcionMenu[]
+): string {
+  if (slot.tipo === "desayuno") return slot.carbohidrato || "—";
+  if (slot.tipo === "plato") {
+    const plato = platos.find((p) => p.id === slot.proteinaId);
+    return plato?.nombre ?? "—";
+  }
+  const proteina = proteinas.find((p) => p.id === slot.proteinaId);
+  if (!proteina) return "—";
+  return `${proteina.nombre}${slot.carbohidrato ? ` + ${slot.carbohidrato}` : ""}`;
+}
+
+function ResumenParcial({
+  comidas,
+  proteinas,
+  platos,
+  onEditar,
+}: {
+  comidas: ComidaSlot[];
+  proteinas: OpcionMenu[];
+  platos: OpcionMenu[];
+  onEditar: (indice: number) => void;
+}) {
+  const [expandido, setExpandido] = useState(false);
+
+  if (comidas.length === 0) return null;
+
+  return (
+    <div className="mb-6 bg-surface-container-low rounded-2xl border border-outline-variant overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpandido((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 font-sans text-sm font-semibold text-on-surface"
+      >
+        <span>
+          Your meals so far ({comidas.length})
+        </span>
+        <ChevronDown
+          size={16}
+          className={`transition-transform ${expandido ? "rotate-180" : ""}`}
+        />
+      </button>
+      {expandido && (
+        <div className="px-2 pb-2 space-y-1">
+          {comidas.map((c, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onEditar(i)}
+              className="w-full text-left px-2.5 py-2 rounded-xl hover:bg-surface-container-high transition-colors flex items-start gap-2"
+            >
+              <span className="shrink-0 w-5 h-5 rounded-full bg-primary text-on-primary text-[10px] font-bold flex items-center justify-center mt-0.5">
+                {i + 1}
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-xs text-on-surface truncate">
+                  {descripcionCorta(c, proteinas, platos)}
+                  {c.extraActivo && c.extraValor ? ` + ${c.extraValor}` : ""}
+                </span>
+                {c.comentario && (
+                  <span className="block text-[11px] text-on-surface-variant italic truncate">
+                    Note: {c.comentario}
+                  </span>
+                )}
+              </span>
+              <Pencil size={11} className="opacity-50 shrink-0 mt-1" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PedidoWizard({
   proteinas,
   carbohidratos,
@@ -248,6 +329,7 @@ export function PedidoWizard({
   const [enviado, setEnviado] = useState(false);
   const [resumenVisitado, setResumenVisitado] = useState(false);
   const [mostrarAvisoCorte, setMostrarAvisoCorte] = useState(false);
+  const [mostrarAvisoDuplicado, setMostrarAvisoDuplicado] = useState(false);
   const [forzarProximaSemana, setForzarProximaSemana] = useState(false);
 
   const totalPasos = cantidad + 4; // cantidad + modo + N comidas + entrega + resumen
@@ -341,7 +423,7 @@ export function PedidoWizard({
     0
   );
 
-  function enviar() {
+  function enviar(confirmarDuplicado = false) {
     if (!diaEntrega) return;
     if (
       tipoEntrega === "delivery"
@@ -382,12 +464,18 @@ export function PedidoWizard({
             modo === "macro" && c.tipo !== "desayuno" ? c.gramosCarbohidrato : null,
           precio: precioComida(c, modo, proteinas, opcionesDesayuno, extrasConfig, platos, carbohidratosFull, vegetalesFull),
           es_desayuno: c.tipo === "desayuno",
+          comentario: c.comentario.trim() || null,
         };
       }
     );
 
     startTransition(async () => {
-      const resultado = await enviarPedido(datosEntrega, modo, comidasSeleccionadas);
+      const resultado = await enviarPedido(
+        datosEntrega,
+        modo,
+        comidasSeleccionadas,
+        confirmarDuplicado
+      );
       if (resultado.success) {
         setEnviado(true);
         if (ventana) {
@@ -395,6 +483,9 @@ export function PedidoWizard({
         } else {
           window.location.href = resultado.whatsappUrl;
         }
+      } else if (resultado.esDuplicado) {
+        ventana?.close();
+        setMostrarAvisoDuplicado(true);
       } else {
         ventana?.close();
         setError(resultado.error);
@@ -449,6 +540,15 @@ export function PedidoWizard({
         )}
 
         {esPasoModo && <PasoModo modo={modo} onCambiar={cambiarModo} />}
+
+        {esPasoComida && (
+          <ResumenParcial
+            comidas={comidas.slice(0, paso - 2)}
+            proteinas={proteinas}
+            platos={platos}
+            onEditar={(i) => setPaso(i + 2)}
+          />
+        )}
 
         {esPasoComida && (
           <PasoComida
@@ -543,7 +643,7 @@ export function PedidoWizard({
         ) : (
           <button
             type="button"
-            onClick={enviar}
+            onClick={() => enviar()}
             disabled={enviando || enviado}
             className="flex-1 bg-secondary text-on-secondary py-3 rounded-2xl font-sans text-sm font-semibold disabled:opacity-60 active:scale-95 transition-all flex items-center justify-center gap-2"
           >
@@ -595,6 +695,43 @@ export function PedidoWizard({
                 className="flex-1 bg-surface-container-high text-on-surface py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
               >
                 Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarAvisoDuplicado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 max-w-sm w-full space-y-4">
+            <div className="flex items-center gap-2 text-on-surface">
+              <AlertTriangle size={20} className="text-secondary" />
+              <h3 className="font-display text-lg font-semibold">
+                Possible duplicate order
+              </h3>
+            </div>
+            <p className="font-sans text-sm text-on-surface-variant">
+              You already have an order with these exact same meals for this
+              day that hasn&apos;t been delivered yet. Did you mean to send
+              it again?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setMostrarAvisoDuplicado(false);
+                  enviar(true);
+                }}
+                className="flex-1 bg-primary text-on-primary py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
+              >
+                Send anyway
+              </button>
+              <button
+                type="button"
+                onClick={() => setMostrarAvisoDuplicado(false)}
+                className="flex-1 bg-surface-container-high text-on-surface py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
+              >
+                Cancel
               </button>
             </div>
           </div>
@@ -1057,6 +1194,19 @@ function PasoComida({
           />
         </>
       )}
+
+      <div className="space-y-2">
+        <label className="font-sans text-xs font-bold text-on-surface-variant uppercase">
+          Notes for this meal (optional)
+        </label>
+        <textarea
+          value={comida.comentario}
+          onChange={(e) => onCambiar({ comentario: e.target.value })}
+          placeholder="e.g., no onions, sauce on the side..."
+          rows={2}
+          className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant rounded-xl font-sans text-sm focus:ring-2 focus:ring-primary outline-none resize-none"
+        />
+      </div>
     </div>
   );
 }
@@ -1449,6 +1599,11 @@ function PasoResumen({
                   ? ` (${c.gramosProteina}g / ${c.gramosCarbohidrato}g)`
                   : ""}
               </p>
+              {c.comentario && (
+                <p className="font-sans text-xs text-on-surface-variant italic mt-1">
+                  Note: {c.comentario}
+                </p>
+              )}
             </button>
           );
         })}

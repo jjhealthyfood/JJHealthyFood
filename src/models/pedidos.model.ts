@@ -34,6 +34,7 @@ export async function crearPedido(
     sede_nombre: datos.sede_nombre ?? null,
     sede_direccion: datos.sede_direccion ?? null,
     direccion_entrega: datos.direccion_entrega ?? null,
+    entregado_en: null,
     ...datos,
   };
 }
@@ -86,7 +87,10 @@ export async function actualizarEstadoPedido(
 ): Promise<Pedido> {
   const { data, error } = await supabase
     .from("pedidos")
-    .update({ estado })
+    .update({
+      estado,
+      entregado_en: estado === "entregado" ? new Date().toISOString() : null,
+    })
     .eq("id", pedidoId)
     .select()
     .single();
@@ -153,7 +157,7 @@ export async function calcularIngresosDelMes(
     .from("pedidos")
     .select("precio_total")
     .eq("estado", "entregado")
-    .gte("fecha_pedido", inicioMes.toISOString());
+    .gte("entregado_en", inicioMes.toISOString());
 
   if (error) throw error;
   return data.reduce((total, p) => total + Number(p.precio_total), 0);

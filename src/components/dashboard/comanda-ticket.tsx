@@ -112,22 +112,29 @@ export function ComandaTicket({
           <div className="flex-1 p-3">
             <ul className="divide-y divide-black/10">
               {comidas.map((c, i) => (
-                <li key={c.id} className="flex items-center gap-2.5 py-1.5">
-                  <span className="shrink-0 w-4 h-4 rounded-full bg-black text-white text-[9px] font-bold flex items-center justify-center">
+                <li key={c.id} className="flex items-start gap-2.5 py-1.5">
+                  <span className="shrink-0 w-4 h-4 rounded-full bg-black text-white text-[9px] font-bold flex items-center justify-center mt-0.5">
                     {i + 1}
                   </span>
-                  <span className="flex-1 text-[12px] text-black font-medium">
-                    {c.es_desayuno
-                      ? c.proteina
-                      : !c.carbohidrato && !c.vegetal
-                      ? c.proteina
-                      : `${c.proteina} + ${c.carbohidrato}${c.vegetal ? ` + ${c.vegetal}` : ""}`}
-                    {c.extra ? ` + ${c.extra}` : ""}
-                    {!c.es_desayuno &&
-                      c.gramos_proteina !== null &&
-                      ` (${c.gramos_proteina}g / ${c.gramos_carbohidrato}g)`}
+                  <span className="flex-1">
+                    <span className="block text-[12px] text-black font-medium">
+                      {c.es_desayuno
+                        ? c.proteina
+                        : !c.carbohidrato && !c.vegetal
+                        ? c.proteina
+                        : `${c.proteina} + ${c.carbohidrato}${c.vegetal ? ` + ${c.vegetal}` : ""}`}
+                      {c.extra ? ` + ${c.extra}` : ""}
+                      {!c.es_desayuno &&
+                        c.gramos_proteina !== null &&
+                        ` (${c.gramos_proteina}g / ${c.gramos_carbohidrato}g)`}
+                    </span>
+                    {c.comentario && (
+                      <span className="block text-[11px] font-bold text-white bg-black px-1.5 py-0.5 rounded mt-0.5 w-fit">
+                        ⚠ {c.comentario}
+                      </span>
+                    )}
                   </span>
-                  <span className="w-3.5 h-3.5 rounded-full border border-black/40 shrink-0" />
+                  <span className="w-3.5 h-3.5 rounded-full border border-black/40 shrink-0 mt-0.5" />
                 </li>
               ))}
             </ul>
