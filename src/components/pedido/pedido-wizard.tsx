@@ -18,11 +18,14 @@ import {
   Settings2,
   AlertTriangle,
   ChevronDown,
+  X,
+  Tag,
 } from "lucide-react";
 import { Chip } from "./chip";
 import {
   buscarClientaPorTelefono,
   enviarPedido,
+  validarCodigoDescuentoAction,
   type ComidaSeleccionada,
   type DatosEntrega,
 } from "@/controllers/pedidos.actions";
@@ -331,6 +334,12 @@ export function PedidoWizard({
   const [mostrarAvisoCorte, setMostrarAvisoCorte] = useState(false);
   const [mostrarAvisoDuplicado, setMostrarAvisoDuplicado] = useState(false);
   const [forzarProximaSemana, setForzarProximaSemana] = useState(false);
+  const [mostrarModalDescuento, setMostrarModalDescuento] = useState(false);
+  const [modalDescuentoVisto, setModalDescuentoVisto] = useState(false);
+  const [codigoDescuento, setCodigoDescuento] = useState("");
+  const [descuentoPct, setDescuentoPct] = useState(0);
+  const [errorCodigo, setErrorCodigo] = useState("");
+  const [validandoCodigo, setValidandoCodigo] = useState(false);
 
   const totalPasos = cantidad + 4; // cantidad + modo + N comidas + entrega + resumen
   const esPasoCantidad = paso === 0;
@@ -342,6 +351,32 @@ export function PedidoWizard({
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [paso]);
+
+  function mostrarModalDescuentoSiCorresponde() {
+    if (!modalDescuentoVisto) {
+      setMostrarModalDescuento(true);
+      setModalDescuentoVisto(true);
+    }
+  }
+
+  function aplicarCodigoDescuento() {
+    const codigo = codigoDescuento.trim();
+    if (!codigo) {
+      setMostrarModalDescuento(false);
+      return;
+    }
+    setErrorCodigo("");
+    setValidandoCodigo(true);
+    validarCodigoDescuentoAction(codigo).then((pct) => {
+      setValidandoCodigo(false);
+      if (pct > 0) {
+        setDescuentoPct(pct);
+        setMostrarModalDescuento(false);
+      } else {
+        setErrorCodigo("That code isn't valid.");
+      }
+    });
+  }
 
   function cambiarCantidad(nueva: number) {
     const limitada = Math.max(1, nueva);
@@ -400,6 +435,7 @@ export function PedidoWizard({
     if (!puedeAvanzar()) return;
     if (resumenVisitado) {
       setPaso(totalPasos - 1);
+      mostrarModalDescuentoSiCorresponde();
       return;
     }
     const nuevoPaso = Math.min(paso + 1, totalPasos - 1);
@@ -410,7 +446,10 @@ export function PedidoWizard({
     }
 
     setPaso(nuevoPaso);
-    if (nuevoPaso === totalPasos - 1) setResumenVisitado(true);
+    if (nuevoPaso === totalPasos - 1) {
+      setResumenVisitado(true);
+      mostrarModalDescuentoSiCorresponde();
+    }
   }
 
   function atras() {
@@ -418,10 +457,11 @@ export function PedidoWizard({
   }
 
   const comidasActivas = comidas.slice(0, cantidad);
-  const total = comidasActivas.reduce(
+  const subtotal = comidasActivas.reduce(
     (suma, c) => suma + precioComida(c, modo, proteinas, opcionesDesayuno, extrasConfig, platos, carbohidratosFull, vegetalesFull),
     0
   );
+  const total = subtotal - (subtotal * descuentoPct) / 100;
 
   function enviar(confirmarDuplicado = false) {
     if (!diaEntrega) return;
@@ -474,7 +514,8 @@ export function PedidoWizard({
         datosEntrega,
         modo,
         comidasSeleccionadas,
-        confirmarDuplicado
+        confirmarDuplicado,
+        descuentoPct > 0 ? codigoDescuento.trim() : ""
       );
       if (resultado.success) {
         setEnviado(true);
@@ -602,8 +643,11 @@ export function PedidoWizard({
             sede={sedes.find((s) => s.id === sedeId) ?? null}
             tipoEntrega={tipoEntrega}
             direccionEntrega={direccionEntrega}
+            subtotal={subtotal}
+            descuentoPct={descuentoPct}
             total={total}
             onEditarPaso={setPaso}
+            onCambiarCodigo={() => setMostrarModalDescuento(true)}
             extrasConfig={extrasConfig}
             platos={platos}
             carbohidratosFull={carbohidratosFull}
@@ -734,6 +778,52 @@ export function PedidoWizard({
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarModalDescuento && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 max-w-sm w-full space-y-4 relative">
+            <button
+              type="button"
+              onClick={() => setMostrarModalDescuento(false)}
+              className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+            <div className="flex items-center gap-2 text-on-surface pr-6">
+              <Tag size={20} className="text-secondary" />
+              <h3 className="font-display text-lg font-semibold">
+                Have a discount code?
+              </h3>
+            </div>
+            <p className="font-sans text-sm text-on-surface-variant">
+              Enter it below, or close this to continue without one.
+            </p>
+            <input
+              type="text"
+              value={codigoDescuento}
+              onChange={(e) => {
+                setCodigoDescuento(e.target.value);
+                setErrorCodigo("");
+              }}
+              onKeyDown={(e) => e.key === "Enter" && aplicarCodigoDescuento()}
+              placeholder="Discount code"
+              className="w-full h-12 px-4 bg-surface-container border border-outline-variant rounded-xl font-sans focus:ring-2 focus:ring-primary outline-none"
+            />
+            {errorCodigo && (
+              <p className="text-xs text-error font-sans">{errorCodigo}</p>
+            )}
+            <button
+              type="button"
+              onClick={aplicarCodigoDescuento}
+              disabled={validandoCodigo || !codigoDescuento.trim()}
+              className="w-full bg-primary text-on-primary py-3 rounded-2xl font-sans text-sm font-semibold disabled:opacity-50 active:scale-95 transition-all"
+            >
+              {validandoCodigo ? "Checking..." : "Apply code"}
+            </button>
           </div>
         </div>
       )}
@@ -1529,8 +1619,11 @@ function PasoResumen({
   sede,
   tipoEntrega,
   direccionEntrega,
+  subtotal,
+  descuentoPct,
   total,
   onEditarPaso,
+  onCambiarCodigo,
   extrasConfig,
   platos = [],
   carbohidratosFull = [],
@@ -1547,8 +1640,11 @@ function PasoResumen({
   sede: SedeRetiro | null;
   tipoEntrega: TipoEntrega;
   direccionEntrega: string;
+  subtotal: number;
+  descuentoPct: number;
   total: number;
   onEditarPaso: (paso: number) => void;
+  onCambiarCodigo: () => void;
   extrasConfig?: ExtrasConfig;
   platos?: OpcionMenu[];
   carbohidratosFull?: OpcionMenu[];
@@ -1609,14 +1705,44 @@ function PasoResumen({
         })}
       </div>
 
-      <div className="flex justify-between items-center px-4 py-3 bg-primary/10 rounded-xl">
-        <span className="font-sans text-sm font-semibold text-primary">
-          Estimated total
-        </span>
-        <span className="font-display text-xl font-semibold text-primary">
-          {formatearMoneda(total)}
-        </span>
+      <div className="bg-primary/10 rounded-xl px-4 py-3 space-y-1">
+        {descuentoPct > 0 ? (
+          <>
+            <div className="flex justify-between items-center">
+              <span className="font-sans text-xs text-on-surface-variant">
+                Subtotal
+              </span>
+              <span className="font-sans text-xs text-on-surface-variant">
+                {formatearMoneda(subtotal)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="font-sans text-xs text-secondary font-semibold">
+                Discount ({descuentoPct}% off)
+              </span>
+              <span className="font-sans text-xs text-secondary font-semibold">
+                -{formatearMoneda((subtotal * descuentoPct) / 100)}
+              </span>
+            </div>
+          </>
+        ) : null}
+        <div className="flex justify-between items-center">
+          <span className="font-sans text-sm font-semibold text-primary">
+            Total
+          </span>
+          <span className="font-display text-xl font-semibold text-primary">
+            {formatearMoneda(total)}
+          </span>
+        </div>
       </div>
+
+      <button
+        type="button"
+        onClick={onCambiarCodigo}
+        className="w-full text-center font-sans text-xs text-secondary font-semibold hover:underline"
+      >
+        {descuentoPct > 0 ? "Change discount code" : "Have a discount code?"}
+      </button>
 
       <button
         type="button"

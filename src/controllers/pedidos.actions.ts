@@ -103,6 +103,30 @@ async function esPedidoDuplicado(
   return false;
 }
 
+async function validarCodigoDescuento(
+  supabase: SupabaseClient,
+  codigo: string
+): Promise<number> {
+  const limpio = codigo.trim();
+  if (!limpio) return 0;
+
+  const [codigo5, codigo10] = await Promise.all([
+    obtenerConfiguracion(supabase, "codigo_descuento_5"),
+    obtenerConfiguracion(supabase, "codigo_descuento_10"),
+  ]);
+
+  if (codigo10 && limpio.toLowerCase() === codigo10.toLowerCase()) return 10;
+  if (codigo5 && limpio.toLowerCase() === codigo5.toLowerCase()) return 5;
+  return 0;
+}
+
+export async function validarCodigoDescuentoAction(
+  codigo: string
+): Promise<number> {
+  const supabase = await createClient();
+  return validarCodigoDescuento(supabase, codigo);
+}
+
 export async function buscarClientaPorTelefono(
   telefono: string
 ): Promise<ClientaEncontrada | null> {
@@ -122,7 +146,8 @@ function construirMensajeWhatsapp(
   datos: DatosEntrega,
   modo: ModoPedido,
   comidas: ComidaSeleccionada[],
-  total: number,
+  subtotal: number,
+  descuentoPct: number,
   sedeNombre: string | null,
   sedeDireccion: string | null
 ) {
@@ -150,10 +175,17 @@ function construirMensajeWhatsapp(
       ? `*Delivery to:* ${datos.direccion_entrega}`
       : `*Pickup at:* ${sedeNombre} — ${sedeDireccion}`;
 
+  const totalLinea =
+    descuentoPct > 0
+      ? `*Subtotal: ${formatearMoneda(subtotal)}*\n` +
+        `*Discount (${descuentoPct}% off): -${formatearMoneda((subtotal * descuentoPct) / 100)}*\n` +
+        `*Total: ${formatearMoneda(subtotal - (subtotal * descuentoPct) / 100)}*\n\n`
+      : `*Estimated total: ${formatearMoneda(subtotal)}*\n\n`;
+
   return (
     `*✅ Order #${numeroOrden} received!*\n\n` +
     `Hi JJ Healthy Food! I'd like to place this order (${modoLabel}):\n\n${lineas}\n\n` +
-    `*Estimated total: ${formatearMoneda(total)}*\n\n` +
+    totalLinea +
     `*${datos.tipo_entrega === "delivery" ? "Delivery" : "Pickup"} day:* ${diaLabel}\n` +
     `${entregaLinea}\n` +
     `*Name:* ${datos.nombre}` +
@@ -165,7 +197,8 @@ export async function enviarPedido(
   datosEntrega: DatosEntrega,
   modo: ModoPedido,
   comidas: ComidaSeleccionada[],
-  confirmarDuplicado = false
+  confirmarDuplicado = false,
+  codigoDescuento = ""
 ): Promise<ResultadoEnvioPedido> {
   console.log("=== INICIO ENVIAR PEDIDO ===");
   console.log("Datos entrega:", datosEntrega);
@@ -238,8 +271,10 @@ export async function enviarPedido(
   }
 
   try {
-    const total = comidas.reduce((suma, c) => suma + c.precio, 0);
-    console.log("Total:", total);
+    const subtotal = comidas.reduce((suma, c) => suma + c.precio, 0);
+    const descuentoPct = await validarCodigoDescuento(supabase, codigoDescuento);
+    const total = subtotal - (subtotal * descuentoPct) / 100;
+    console.log("Subtotal:", subtotal, "Descuento:", descuentoPct, "Total:", total);
 
     console.log("Creando pedido...");
     const pedido = await crearPedido(supabase, {
@@ -255,6 +290,8 @@ export async function enviarPedido(
         datosEntrega.tipo_entrega === "delivery"
           ? datosEntrega.direccion_entrega.trim()
           : undefined,
+      descuento_pct: descuentoPct,
+      codigo_descuento: descuentoPct > 0 ? codigoDescuento.trim() : undefined,
     });
 
     console.log("Pedido creado:", pedido.id);
@@ -277,7 +314,8 @@ export async function enviarPedido(
       datosEntrega,
       modo,
       comidas,
-      total,
+      subtotal,
+      descuentoPct,
       sedeElegida?.nombre ?? null,
       sedeElegida?.direccion ?? null
     );

@@ -12,7 +12,13 @@ export async function crearPedido(
     Partial<
       Pick<
         Pedido,
-        "notas" | "tipo_entrega" | "sede_nombre" | "sede_direccion" | "direccion_entrega"
+        | "notas"
+        | "tipo_entrega"
+        | "sede_nombre"
+        | "sede_direccion"
+        | "direccion_entrega"
+        | "descuento_pct"
+        | "codigo_descuento"
       >
     >
 ): Promise<Pedido> {
@@ -35,6 +41,8 @@ export async function crearPedido(
     sede_direccion: datos.sede_direccion ?? null,
     direccion_entrega: datos.direccion_entrega ?? null,
     entregado_en: null,
+    descuento_pct: datos.descuento_pct ?? 0,
+    codigo_descuento: datos.codigo_descuento ?? null,
     ...datos,
   };
 }

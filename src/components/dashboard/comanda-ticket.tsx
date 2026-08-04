@@ -64,6 +64,15 @@ export function ComandaTicket({
           </div>
         </div>
 
+        {pedido.descuento_pct > 0 && (
+          <div className="bg-black/10 border-b-2 border-black px-4 py-1.5">
+            <p className="text-[10px] font-bold text-black uppercase tracking-wider">
+              ⚠ {pedido.descuento_pct}% off applied
+              {pedido.codigo_descuento ? ` — code: ${pedido.codigo_descuento}` : ""}
+            </p>
+          </div>
+        )}
+
         {/* Cuerpo: dos columnas */}
         <div className="flex divide-x divide-black/15">
           {/* Datos de la clienta */}

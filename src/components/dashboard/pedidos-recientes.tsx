@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { MapPin, Printer, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { MapPin, Printer, ChevronLeft, ChevronRight, Search, Tag } from "lucide-react";
 import type { PedidoConDetalle } from "@/models/types";
 import { EstadoSelector } from "./estado-selector";
 import { PrecioEditor } from "./precio-editor";
@@ -163,6 +163,12 @@ export function PedidosRecientes({
                         pedidoId={pedido.id}
                         precioInicial={pedido.precio_total}
                       />
+                      {pedido.descuento_pct > 0 && (
+                        <span className="inline-flex items-center gap-1 mt-1 bg-secondary text-on-secondary text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
+                          <Tag size={11} />
+                          {pedido.descuento_pct}% OFF
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-5 text-center">
                       <EstadoSelector
@@ -203,10 +209,17 @@ export function PedidosRecientes({
                   {detalleComidas(pedido)}
                 </div>
                 <div className="flex justify-between items-center border-t border-outline-variant/20 pt-3">
-                  <PrecioEditor
-                    pedidoId={pedido.id}
-                    precioInicial={pedido.precio_total}
-                  />
+                  <div>
+                    <PrecioEditor
+                      pedidoId={pedido.id}
+                      precioInicial={pedido.precio_total}
+                    />
+                    {pedido.descuento_pct > 0 && (
+                      <span className="inline-block mt-1 bg-secondary-container/40 text-on-secondary-container text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        {pedido.descuento_pct}% off
+                      </span>
+                    )}
+                  </div>
                   <BotonImprimir pedidoId={pedido.id} />
                 </div>
               </div>

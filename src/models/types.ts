@@ -26,6 +26,8 @@ export type Pedido = {
   sede_direccion: string | null;
   direccion_entrega: string | null;
   entregado_en: string | null;
+  descuento_pct: number;
+  codigo_descuento: string | null;
 };
 
 export type SedeRetiro = {
