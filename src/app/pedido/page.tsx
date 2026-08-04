@@ -19,8 +19,9 @@ export default async function PedidoPage() {
   const proteinas = opciones.filter((o) => o.categoria === "proteina");
   const carbohidratosFull = opciones.filter((o) => o.categoria === "carbohidrato");
   const vegetalesFull = opciones.filter((o) => o.categoria === "vegetal");
+  const vegetalesMeal = vegetalesFull.filter((o) => !o.solo_extra);
   const carbohidratos = carbohidratosFull.map((o) => o.nombre);
-  const vegetales = vegetalesFull.map((o) => o.nombre);
+  const vegetales = vegetalesMeal.map((o) => o.nombre);
   const opcionesDesayuno = opciones
     .filter((o) => o.categoria === "desayuno");
   const platos = opciones.filter((o) => o.categoria === "plato");

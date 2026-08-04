@@ -153,3 +153,15 @@ export async function actualizarExtraPriceOverride(
     .eq("id", id);
   if (error) throw error;
 }
+
+export async function actualizarSoloExtra(
+  supabase: SupabaseClient,
+  id: string,
+  soloExtra: boolean
+): Promise<void> {
+  const { error } = await supabase
+    .from("opciones_menu")
+    .update({ solo_extra: soloExtra })
+    .eq("id", id);
+  if (error) throw error;
+}

@@ -24,6 +24,34 @@ const DIAS_LABELS: Record<string, string> = {
   sabado: "Sábado",
 };
 
+function calcularFechaEntrega(diaEntrega: string, fechaPedido: string): Date {
+  const pedido = new Date(fechaPedido);
+  const diaNum = diaEntrega === "domingo" ? 0 : 1;
+  const diff = (diaNum - pedido.getDay() + 7) % 7;
+  const fecha = new Date(pedido);
+  fecha.setDate(pedido.getDate() + (diff === 0 ? 7 : diff));
+  return fecha;
+}
+
+function formatearFecha(fecha: Date) {
+  return new Intl.DateTimeFormat("es-VE", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(fecha);
+}
+
+function formatearFechaHora(fechaIso: string) {
+  const fecha = new Date(fechaIso);
+  return new Intl.DateTimeFormat("es-VE", {
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(fecha);
+}
+
 export function ComandaTicket({
   pedido,
   showSeparator = true,
@@ -35,6 +63,9 @@ export function ComandaTicket({
     (a, b) => a.numero_comida - b.numero_comida
   );
   const diaLabel = DIAS_LABELS[pedido.dia_entrega] ?? pedido.dia_entrega;
+  const fechaEntrega = calcularFechaEntrega(pedido.dia_entrega, pedido.fecha_pedido);
+  const fechaPedidoStr = formatearFechaHora(pedido.fecha_pedido);
+  const fechaEntregaStr = formatearFecha(fechaEntrega);
 
   return (
     <div className="print:break-inside-avoid print:[page-break-inside:avoid] print:mb-3">
@@ -96,12 +127,14 @@ export function ComandaTicket({
             )}
             {pedido.notas && <Campo label="Detalles" valor={pedido.notas} />}
 
+            <Campo label="Pedido el" valor={fechaPedidoStr} />
+
             <div>
               <p className="text-[8px] font-bold uppercase tracking-wider text-black/50">
                 {pedido.tipo_entrega === "delivery" ? "Delivery" : "Retiro"}
               </p>
               <span className="inline-block mt-1 bg-black text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                {diaLabel}
+                {diaLabel} {fechaEntregaStr}
               </span>
             </div>
 

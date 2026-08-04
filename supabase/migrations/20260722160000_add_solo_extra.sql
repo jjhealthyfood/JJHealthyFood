@@ -1,0 +1,1 @@
+ALTER TABLE public.opciones_menu ADD COLUMN IF NOT EXISTS solo_extra BOOLEAN DEFAULT FALSE;

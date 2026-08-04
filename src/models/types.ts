@@ -88,4 +88,5 @@ export type OpcionMenu = {
   orden: number;
   excluido_extra: boolean;
   extra_price_override: number | null;
+  solo_extra: boolean;
 };

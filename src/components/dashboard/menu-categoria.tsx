@@ -7,6 +7,7 @@ import {
   borrarOpcionMenu,
   cambiarPrecioMacroGramo,
   cambiarPrecioRacion,
+  cambiarSoloExtra,
 } from "@/controllers/dashboard-menu.actions";
 import type { CategoriaMenu, NivelProteina, OpcionMenu } from "@/models/types";
 
@@ -240,9 +241,15 @@ export function MenuCategoria({
   const [precioDesayuno, setPrecioDesayuno] = useState("7");
   const [pending, startTransition] = useTransition();
   const [errorNombre, setErrorNombre] = useState("");
+  const [eliminados, setEliminados] = useState<string[]>([]);
+  const [opcionesLocales, setOpcionesLocales] = useState<OpcionMenu[]>(opciones);
 
-  const sencillas = opciones.filter((o) => o.nivel === "sencilla");
-  const premium = opciones.filter((o) => o.nivel === "premium");
+  const opcionesVisibles = opcionesLocales.filter((o) =>
+    !eliminados.includes(o.id) && !(categoria === "vegetal" && o.solo_extra)
+  );
+
+  const sencillas = opcionesVisibles.filter((o) => o.nivel === "sencilla");
+  const premium = opcionesVisibles.filter((o) => o.nivel === "premium");
 
   const preciosDefault: Record<NivelProteina, { racion: string; macro: string }> = {
     sencilla: { racion: "9", macro: "12" },
@@ -259,7 +266,7 @@ export function MenuCategoria({
     const nombre = nuevo.trim();
     if (!nombre) return;
 
-    const nombresAComparar = todosLosNombres ?? opciones.map((o) => o.nombre);
+    const nombresAComparar = opcionesVisibles.map((o) => o.nombre);
     const existe = nombresAComparar.some(
       (n) => n.toLowerCase() === nombre.toLowerCase()
     );
@@ -296,6 +303,16 @@ export function MenuCategoria({
   function quitar(id: string) {
     startTransition(async () => {
       await borrarOpcionMenu(id);
+      setEliminados((prev) => [...prev, id]);
+    });
+  }
+
+  function toggleSoloExtra(id: string, soloExtra: boolean) {
+    startTransition(async () => {
+      await cambiarSoloExtra(id, soloExtra);
+      setOpcionesLocales((prev) =>
+        prev.map((o) => (o.id === id ? { ...o, solo_extra: soloExtra } : o))
+      );
     });
   }
 
@@ -490,12 +507,12 @@ export function MenuCategoria({
       ) : (
         <>
           <div className="flex flex-wrap gap-2 mb-5">
-            {opciones.length === 0 && (
+            {opcionesVisibles.length === 0 && (
               <p className="text-sm text-on-surface-variant font-sans italic">
                 Sin opciones todavía.
               </p>
             )}
-            {opciones.map((o) => (
+            {opcionesVisibles.map((o) => (
               <ChipSimple
                 key={o.id}
                 opcion={o}

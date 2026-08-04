@@ -10,6 +10,7 @@ import {
   actualizarExtrasConfig,
   toggleExcluidoExtra,
   actualizarExtraPriceOverride,
+  actualizarSoloExtra,
 } from "@/models/menu.model";
 import type { CategoriaMenu, NivelProteina } from "@/models/types";
 import type { ExtrasConfig } from "@/models/menu.model";
@@ -215,6 +216,13 @@ export async function toggleExtraOpcion(id: string, excluido: boolean) {
 export async function cambiarExtraPriceOverride(id: string, precio: number | null) {
   const supabase = await createClient();
   await actualizarExtraPriceOverride(supabase, id, precio);
+  revalidatePath("/dashboard/menu");
+  revalidatePath("/pedido");
+}
+
+export async function cambiarSoloExtra(id: string, soloExtra: boolean) {
+  const supabase = await createClient();
+  await actualizarSoloExtra(supabase, id, soloExtra);
   revalidatePath("/dashboard/menu");
   revalidatePath("/pedido");
 }

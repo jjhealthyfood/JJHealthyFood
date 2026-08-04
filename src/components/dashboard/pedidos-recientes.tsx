@@ -23,6 +23,16 @@ function iniciales(nombre: string) {
     .join("");
 }
 
+function formatearFecha(fechaIso: string) {
+  return new Intl.DateTimeFormat("es-VE", {
+    day: "2-digit",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(fechaIso));
+}
+
 function detalleComidas(pedido: PedidoConDetalle) {
   const proteinas = Array.from(
     new Set(pedido.comidas_pedido.map((c) => c.proteina))
@@ -103,6 +113,9 @@ export function PedidosRecientes({
               <thead>
                 <tr className="bg-surface-container-low border-b border-outline-variant">
                   <th className="px-6 py-4 font-sans text-xs font-bold text-on-surface-variant uppercase">
+                    Fecha
+                  </th>
+                  <th className="px-6 py-4 font-sans text-xs font-bold text-on-surface-variant uppercase">
                     Cliente
                   </th>
                   <th className="px-6 py-4 font-sans text-xs font-bold text-on-surface-variant uppercase">
@@ -128,6 +141,11 @@ export function PedidosRecientes({
                     key={pedido.id}
                     className="hover:bg-surface-bright transition-colors"
                   >
+                    <td className="px-6 py-5">
+                      <p className="font-sans text-sm text-on-surface whitespace-nowrap">
+                        {formatearFecha(pedido.fecha_pedido)}
+                      </p>
+                    </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         <div
@@ -193,6 +211,9 @@ export function PedidosRecientes({
                   <div className="flex flex-col">
                     <span className="font-sans text-sm font-semibold text-on-surface">
                       {pedido.clientas?.nombre ?? "Clienta eliminada"}
+                    </span>
+                    <span className="text-xs text-on-surface-variant">
+                      {formatearFecha(pedido.fecha_pedido)}
                     </span>
                     <span className="text-sm text-on-surface-variant">
                       {pedido.tipo_entrega === "delivery"

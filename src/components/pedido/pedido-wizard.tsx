@@ -53,7 +53,7 @@ type ComidaSlot = {
   gramosProteina: number;
   gramosCarbohidrato: number;
   extraActivo: boolean;
-  extraValor: string;
+  extras: string[];
   comentario: string;
 };
 
@@ -66,7 +66,7 @@ const comidaVacia: ComidaSlot = {
   gramosProteina: 100,
   gramosCarbohidrato: 100,
   extraActivo: false,
-  extraValor: "",
+  extras: [],
   comentario: "",
 };
 
@@ -164,8 +164,11 @@ function precioComida(
   }
 
   let extra = 0;
-  if (slot.extraActivo && slot.extraValor) {
-    extra = precioExtraDeItem(slot.extraValor, proteinas, carbohidratosFull, vegetalesFull, extrasConfig);
+  if (slot.extraActivo && slot.extras && slot.extras.length > 0) {
+    extra = slot.extras.reduce(
+      (suma, nombre) => suma + precioExtraDeItem(nombre, proteinas, carbohidratosFull, vegetalesFull, extrasConfig),
+      0
+    );
   }
 
   return base + extra;
@@ -272,7 +275,7 @@ function ResumenParcial({
               <span className="flex-1 min-w-0">
                 <span className="block text-xs text-on-surface truncate">
                   {descripcionCorta(c, proteinas, platos)}
-                  {c.extraActivo && c.extraValor ? ` + ${c.extraValor}` : ""}
+                  {c.extraActivo && c.extras && c.extras.length > 0 ? ` + ${c.extras.join(", ")}` : ""}
                 </span>
                 {c.comentario && (
                   <span className="block text-[11px] text-on-surface-variant italic truncate">
@@ -497,7 +500,7 @@ export function PedidoWizard({
           proteina: c.tipo === "desayuno" ? c.carbohidrato : c.tipo === "plato" ? plato?.nombre ?? "" : proteina?.nombre ?? "",
           carbohidrato: c.tipo === "desayuno" || c.tipo === "plato" ? "" : c.carbohidrato,
           vegetal: c.tipo === "desayuno" || c.tipo === "plato" ? null : c.vegetal || null,
-          extra: c.extraActivo && c.extraValor ? c.extraValor : null,
+          extra: c.extraActivo && c.extras && c.extras.length > 0 ? c.extras.join(", ") : null,
           gramos_proteina:
             modo === "macro" && c.tipo !== "desayuno" ? c.gramosProteina : null,
           gramos_carbohidrato:
@@ -1316,6 +1319,16 @@ function ExtraToggle({
   vegetalesFull: OpcionMenu[];
   extrasConfig?: ExtrasConfig;
 }) {
+  const extrasActuales = comida.extras ?? [];
+
+  function toggleExtra(nombre: string) {
+    const yaExiste = extrasActuales.includes(nombre);
+    const nuevos = yaExiste
+      ? extrasActuales.filter((e) => e !== nombre)
+      : [...extrasActuales, nombre];
+    onCambiar({ extras: nuevos });
+  }
+
   return (
     <div>
       <label className="flex items-center justify-between cursor-pointer mb-3">
@@ -1326,7 +1339,7 @@ function ExtraToggle({
           type="checkbox"
           checked={comida.extraActivo}
           onChange={(e) =>
-            onCambiar({ extraActivo: e.target.checked, extraValor: "" })
+            onCambiar({ extraActivo: e.target.checked, extras: [] })
           }
           className="w-5 h-5 rounded text-secondary focus:ring-secondary"
         />
@@ -1344,8 +1357,8 @@ function ExtraToggle({
                   <Chip
                     key={p.id}
                     label={`${p.nombre} (+ $${precio})`}
-                    selected={comida.extraValor === p.nombre}
-                    onClick={() => onCambiar({ extraValor: p.nombre })}
+                    selected={extrasActuales.includes(p.nombre)}
+                    onClick={() => toggleExtra(p.nombre)}
                   />
                 );
               })}
@@ -1362,8 +1375,8 @@ function ExtraToggle({
                   <Chip
                     key={c.id}
                     label={`${c.nombre} (+ $${precio})`}
-                    selected={comida.extraValor === c.nombre}
-                    onClick={() => onCambiar({ extraValor: c.nombre })}
+                    selected={extrasActuales.includes(c.nombre)}
+                    onClick={() => toggleExtra(c.nombre)}
                   />
                 );
               })}
@@ -1381,8 +1394,8 @@ function ExtraToggle({
                   <Chip
                     key={v.id}
                     label={texto}
-                    selected={comida.extraValor === v.nombre}
-                    onClick={() => onCambiar({ extraValor: v.nombre })}
+                    selected={extrasActuales.includes(v.nombre)}
+                    onClick={() => toggleExtra(v.nombre)}
                   />
                 );
               })}
@@ -1690,7 +1703,7 @@ function PasoResumen({
                   : c.tipo === "plato"
                   ? platoItem?.nombre ?? ""
                   : `${proteina?.nombre} + ${c.carbohidrato}${c.vegetal ? ` + ${c.vegetal}` : ""}`}
-                {c.extraActivo && c.extraValor ? ` + ${c.extraValor}` : ""}
+                {c.extraActivo && c.extras && c.extras.length > 0 ? ` + ${c.extras.join(", ")}` : ""}
                 {modo === "macro" && c.tipo !== "desayuno"
                   ? ` (${c.gramosProteina}g / ${c.gramosCarbohidrato}g)`
                   : ""}
@@ -1801,14 +1814,16 @@ function IconoInstagram({ size = 20 }: { size?: number }) {
 }
 
 const CARRUSEL_PLATOS = [
-  { nombre: "Egg Wrap with Turkey Bacon & Fruit", src: "/carrusel/desayuno-huevo-tocino-fruta.jpeg" },
-  { nombre: "Ground Beef, Broccoli & Sweet Potato Mash", src: "/carrusel/carne-molida-brocoli-batata.jpeg" },
-  { nombre: "Teriyaki Chicken Bowl", src: "/carrusel/pollo-teriyaki-arroz-edamame.jpeg" },
-  { nombre: "Stuffed Plantain (Canoa)", src: "/carrusel/canoa-carne-queso.jpeg" },
-  { nombre: "Chicken, Zucchini & Yuca", src: "/carrusel/pollo-yuca-zucchini.jpeg" },
-  { nombre: "Ground Beef, Pasta & Plantain", src: "/carrusel/carne-molida-pasta-platano.jpeg" },
-  { nombre: "Beef Strips, Yuca & Green Beans", src: "/carrusel/res-yuca-vainitas.jpeg" },
   { nombre: "Mexican Bowl", src: "/carrusel/mexican-bowl.jpeg" },
+  { nombre: "Grilled Fish, Rice & Green Beans", src: "/carrusel/pescado-arroz-vainitas.jpeg" },
+  { nombre: "Steak, Sweet Potato & Asparagus", src: "/carrusel/res-batata-esparragos.jpeg" },
+  { nombre: "Ground Beef, Pasta & Green Beans", src: "/carrusel/carne-molida-pasta-vainitas.jpeg" },
+  { nombre: "Steak, Rice & Asparagus", src: "/carrusel/res-arroz-esparragos.jpeg" },
+  { nombre: "Tuna Ceviche with Quinoa", src: "/carrusel/atun-quinoa-picodegallo.jpeg" },
+  { nombre: "Stuffed Plantain with Cheese & Broccoli", src: "/carrusel/canoa-queso-brocoli.jpeg" },
+  { nombre: "Chicken Wrap", src: "/carrusel/wrap-pollo-vegetales.jpeg" },
+  { nombre: "Shrimp Alfredo Pasta with Asparagus", src: "/carrusel/camarones-pasta-esparragos.jpeg" },
+  { nombre: "Salmon, Quinoa & Salad", src: "/carrusel/salmon-quinoa-ensalada.jpeg" },
 ];
 
 const PLATOS_DUPLICADOS = [...CARRUSEL_PLATOS, ...CARRUSEL_PLATOS];
@@ -1900,10 +1915,10 @@ function CarruselComidas() {
             <div
               key={i}
               data-idx={i}
-              className="group flex flex-col items-center shrink-0 w-44 md:w-56"
+              className="group flex flex-col items-center shrink-0 w-48 md:w-64"
             >
               <div
-                className={`relative w-44 h-44 md:w-56 md:h-56 rounded-full overflow-hidden shadow-md transition-transform duration-300 ease-out ${
+                className={`relative w-48 h-48 md:w-64 md:h-64 rounded-full overflow-hidden shadow-md transition-transform duration-300 ease-out ${
                   activo
                     ? "scale-110 -translate-y-2"
                     : "group-hover:scale-110 group-hover:-translate-y-2"
@@ -1914,7 +1929,7 @@ function CarruselComidas() {
                   alt={plato.nombre}
                   fill
                   draggable={false}
-                  sizes="(min-width: 768px) 224px, 176px"
+                  sizes="(min-width: 768px) 256px, 192px"
                   className="object-cover pointer-events-none"
                 />
                 <div
@@ -2141,11 +2156,11 @@ function IntroScreen({
           </div>
           <div className="relative rounded-3xl overflow-hidden shadow-md aspect-[4/5] max-h-[420px] mx-auto w-full max-w-sm">
             <Image
-              src="/carrusel/waffle.jpg"
-              alt="Waffles breakfast plate"
+              src="/carrusel/desayuno-waffle-fresas.jpeg"
+              alt="Waffles with strawberries breakfast plate"
               fill
               sizes="(min-width: 768px) 384px, 100vw"
-              className="object-cover object-bottom"
+              className="object-cover"
             />
           </div>
         </div>
