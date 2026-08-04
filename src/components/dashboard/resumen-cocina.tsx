@@ -121,8 +121,8 @@ function BloqueModo({
   if (vacio) return null;
 
   return (
-    <div className="print:break-inside-avoid">
-      <div className="bg-black/5 px-4 py-1.5">
+    <div>
+      <div className="bg-black/5 px-4 py-1.5 print:break-inside-avoid print:[page-break-inside:avoid]">
         <p className="text-[10px] font-bold uppercase tracking-widest text-black">
           {titulo}
         </p>
@@ -154,10 +154,12 @@ export function ResumenCocina({ pedidos }: { pedidos: PedidoParaComanda[] }) {
           </p>
         </div>
 
-        <Seccion titulo="Desayunos" filas={resumen.desayunos} />
-        <Seccion titulo="Platos" filas={resumen.platos} />
-        <BloqueModo titulo="Por porción (regular)" grupo={resumen.regular} />
-        <BloqueModo titulo="Por gramos (macro)" grupo={resumen.macro} />
+        <div className="print:columns-2 print:gap-x-6">
+          <Seccion titulo="Desayunos" filas={resumen.desayunos} />
+          <Seccion titulo="Platos" filas={resumen.platos} />
+          <BloqueModo titulo="Por porción (regular)" grupo={resumen.regular} />
+          <BloqueModo titulo="Por gramos (macro)" grupo={resumen.macro} />
+        </div>
       </div>
     </div>
   );
