@@ -154,12 +154,10 @@ export function ResumenCocina({ pedidos }: { pedidos: PedidoParaComanda[] }) {
           </p>
         </div>
 
-        <div className="print:columns-2 print:gap-x-6">
-          <Seccion titulo="Desayunos" filas={resumen.desayunos} />
-          <Seccion titulo="Platos" filas={resumen.platos} />
-          <BloqueModo titulo="Por porción (regular)" grupo={resumen.regular} />
-          <BloqueModo titulo="Por gramos (macro)" grupo={resumen.macro} />
-        </div>
+        <Seccion titulo="Desayunos" filas={resumen.desayunos} />
+        <Seccion titulo="Platos" filas={resumen.platos} />
+        <BloqueModo titulo="Por porción (regular)" grupo={resumen.regular} />
+        <BloqueModo titulo="Por gramos (macro)" grupo={resumen.macro} />
       </div>
     </div>
   );
