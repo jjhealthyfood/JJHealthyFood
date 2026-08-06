@@ -13,6 +13,7 @@ export type DatosEntrega = {
   telefono: string;
   detalles: string;
   dia_entrega: DiaEntrega;
+  fecha_entrega: string;
   tipo_entrega: TipoEntrega;
   sede_id: string;
   direccion_entrega: string;
@@ -280,6 +281,7 @@ export async function enviarPedido(
     const pedido = await crearPedido(supabase, {
       clienta_id: clientaId as string,
       dia_entrega: datosEntrega.dia_entrega,
+      fecha_entrega: datosEntrega.fecha_entrega,
       modo,
       precio_total: total,
       notas: datosEntrega.detalles.trim() || undefined,

@@ -481,11 +481,18 @@ export function PedidoWizard({
     // assigned once the server responds.
     const ventana = window.open("", "_blank");
 
+    const fechaEntregaReal = proximaFecha(
+      diaEntrega === "domingo" ? 0 : 1,
+      forzarProximaSemana
+    );
+    const fechaEntregaIso = `${fechaEntregaReal.getFullYear()}-${String(fechaEntregaReal.getMonth() + 1).padStart(2, "0")}-${String(fechaEntregaReal.getDate()).padStart(2, "0")}`;
+
     const datosEntrega: DatosEntrega = {
       nombre: nombre.trim(),
       telefono: telefono.trim(),
       detalles: detalles.trim(),
       dia_entrega: diaEntrega,
+      fecha_entrega: fechaEntregaIso,
       tipo_entrega: tipoEntrega,
       sede_id: sedeId,
       direccion_entrega: direccionEntrega.trim(),

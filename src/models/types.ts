@@ -17,6 +17,7 @@ export type Pedido = {
   clienta_id: string;
   fecha_pedido: string;
   dia_entrega: DiaEntrega;
+  fecha_entrega: string | null;
   estado: EstadoPedido;
   modo: ModoPedido;
   precio_total: number;

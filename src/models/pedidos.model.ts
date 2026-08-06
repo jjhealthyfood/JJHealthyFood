@@ -19,6 +19,7 @@ export async function crearPedido(
         | "direccion_entrega"
         | "descuento_pct"
         | "codigo_descuento"
+        | "fecha_entrega"
       >
     >
 ): Promise<Pedido> {
@@ -43,6 +44,7 @@ export async function crearPedido(
     entregado_en: null,
     descuento_pct: datos.descuento_pct ?? 0,
     codigo_descuento: datos.codigo_descuento ?? null,
+    fecha_entrega: datos.fecha_entrega ?? null,
     ...datos,
   };
 }

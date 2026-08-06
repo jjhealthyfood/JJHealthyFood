@@ -24,7 +24,10 @@ const DIAS_LABELS: Record<string, string> = {
   sabado: "Sábado",
 };
 
-function calcularFechaEntrega(diaEntrega: string, fechaPedido: string): Date {
+// Respaldo solo para pedidos viejos que no tienen fecha_entrega guardada
+// (de antes de este fix). Es una aproximacion: no sabe si la clienta
+// programo el pedido para la semana siguiente, asi que puede fallar.
+function adivinarFechaEntrega(diaEntrega: string, fechaPedido: string): Date {
   const pedido = new Date(fechaPedido);
   const diaNum = diaEntrega === "domingo" ? 0 : 1;
   const diff = (diaNum - pedido.getDay() + 7) % 7;
@@ -63,7 +66,9 @@ export function ComandaTicket({
     (a, b) => a.numero_comida - b.numero_comida
   );
   const diaLabel = DIAS_LABELS[pedido.dia_entrega] ?? pedido.dia_entrega;
-  const fechaEntrega = calcularFechaEntrega(pedido.dia_entrega, pedido.fecha_pedido);
+  const fechaEntrega = pedido.fecha_entrega
+    ? new Date(`${pedido.fecha_entrega}T00:00:00`)
+    : adivinarFechaEntrega(pedido.dia_entrega, pedido.fecha_pedido);
   const fechaPedidoStr = formatearFechaHora(pedido.fecha_pedido);
   const fechaEntregaStr = formatearFecha(fechaEntrega);
 
