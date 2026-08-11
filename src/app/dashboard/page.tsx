@@ -17,7 +17,16 @@ function formatearMoneda(valor: number) {
   }).format(valor);
 }
 
-export default async function PedidosPage() {
+const PEDIDOS_POR_PAGINA = 20;
+
+export default async function PedidosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
+  const { page } = await searchParams;
+  const paginaActual = Math.max(1, Number(page) || 1);
+
   let ingresosMes = 0;
   let pendientes = 0;
   let entregados = 0;
@@ -32,7 +41,7 @@ export default async function PedidosPage() {
       calcularIngresosDelMes(supabase).catch(() => 0),
       contarPedidosPendientes(supabase).catch(() => 0),
       contarPedidosEntregados(supabase).catch(() => 0),
-      listarPedidosRecientes(supabase).catch(() => ({ pedidos: [], total: 0 })),
+      listarPedidosRecientes(supabase, paginaActual, PEDIDOS_POR_PAGINA).catch(() => ({ pedidos: [], total: 0 })),
     ]);
 
     [ingresosMes, pendientes, entregados, { pedidos, total }] = resultados;
@@ -126,7 +135,12 @@ export default async function PedidosPage() {
         </div>
       </div>
 
-      <PedidosRecientes pedidos={pedidos} total={total} />
+      <PedidosRecientes
+        pedidos={pedidos}
+        total={total}
+        paginaActual={paginaActual}
+        porPagina={PEDIDOS_POR_PAGINA}
+      />
     </div>
   );
 }

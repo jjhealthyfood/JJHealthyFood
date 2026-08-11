@@ -29,7 +29,13 @@ export type ClientaEncontrada = {
 
 export type ResultadoEnvioPedido =
   | { success: true; whatsappUrl: string }
-  | { success: false; error: string; esDuplicado?: boolean };
+  | {
+      success: false;
+      error: string;
+      esDuplicado?: boolean;
+      esLimiteAlcanzado?: boolean;
+      whatsappSolicitudUrl?: string;
+    };
 
 const ZIP_FLORIDA_REGEX = /\b3[2-4]\d{3}\b/;
 const ESTADO_FLORIDA_REGEX = /\bFL\b|florida/i;
@@ -68,6 +74,16 @@ function firmaComida(c: FirmaComida): string {
       ? ""
       : String(Number(c.gramos_carbohidrato));
   return [c.proteina, c.carbohidrato ?? "", c.vegetal ?? "", c.extra ?? "", gp, gc, c.es_desayuno].join("|");
+}
+
+// Domingo y el lunes siguiente cuentan como el mismo fin de semana de
+// entrega, asi que el limite se chequea contra el domingo de esa semana.
+function domingoDeLaSemana(fechaEntregaIso: string, diaEntrega: DiaEntrega): string {
+  if (diaEntrega === "domingo") return fechaEntregaIso;
+  const lunes = new Date(`${fechaEntregaIso}T00:00:00`);
+  const domingo = new Date(lunes);
+  domingo.setDate(lunes.getDate() - 1);
+  return `${domingo.getFullYear()}-${String(domingo.getMonth() + 1).padStart(2, "0")}-${String(domingo.getDate()).padStart(2, "0")}`;
 }
 
 async function esPedidoDuplicado(
@@ -234,6 +250,34 @@ export async function enviarPedido(
       return {
         success: false,
         error: "Please choose a valid pickup location and try again.",
+      };
+    }
+  }
+
+  const limiteConfig = await obtenerConfiguracion(supabase, "limite_comidas_semana");
+  const limite = limiteConfig ? parseInt(limiteConfig, 10) : 0;
+  if (limite > 0) {
+    const domingo = domingoDeLaSemana(datosEntrega.fecha_entrega, datosEntrega.dia_entrega);
+    const { data: totalActual } = await supabase.rpc("contar_comidas_fin_de_semana", {
+      p_fecha_domingo: domingo,
+    });
+    const actual = typeof totalActual === "number" ? totalActual : 0;
+    if (actual + comidas.length > limite) {
+      console.log("Limite de comidas del fin de semana alcanzado:", actual, "/", limite);
+      const numeroNegocio =
+        (await obtenerConfiguracion(supabase, "whatsapp_numero")) ??
+        process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ??
+        "";
+      const mensaje =
+        `Hi! I'd like to order ${comidas.length} meal${comidas.length === 1 ? "" : "s"} ` +
+        `for ${datosEntrega.dia_entrega === "domingo" ? "Sunday" : "Monday"}, but the system says ` +
+        `this weekend is already at ${actual}/${limite} meals. My name is ${datosEntrega.nombre}. ` +
+        `Could you make room for my order?`;
+      return {
+        success: false,
+        error: "This weekend's meal capacity has been reached.",
+        esLimiteAlcanzado: true,
+        whatsappSolicitudUrl: `https://wa.me/${numeroNegocio}?text=${encodeURIComponent(mensaje)}`,
       };
     }
   }

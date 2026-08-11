@@ -58,9 +58,13 @@ function BotonImprimir({ pedidoId }: { pedidoId: string }) {
 export function PedidosRecientes({
   pedidos,
   total,
+  paginaActual,
+  porPagina,
 }: {
   pedidos: PedidoConDetalle[];
   total: number;
+  paginaActual: number;
+  porPagina: number;
 }) {
   const [busqueda, setBusqueda] = useState("");
 
@@ -253,26 +257,36 @@ export function PedidosRecientes({
         <p className="font-sans text-xs text-on-surface-variant">
           {busqueda
             ? `Mostrando ${filtrados.length} de ${pedidos.length} pedidos cargados`
-            : `Mostrando ${pedidos.length} de ${total} pedidos`}
+            : `Mostrando ${pedidos.length === 0 ? 0 : (paginaActual - 1) * porPagina + 1}–${(paginaActual - 1) * porPagina + pedidos.length} de ${total} pedidos`}
         </p>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled
-            className="w-8 h-8 flex items-center justify-center rounded border border-outline-variant text-on-surface disabled:opacity-30"
-          >
-            <ChevronLeft size={16} />
-          </button>
+          {paginaActual > 1 ? (
+            <Link
+              href={`/dashboard?page=${paginaActual - 1}`}
+              className="w-8 h-8 flex items-center justify-center rounded border border-outline-variant text-on-surface"
+            >
+              <ChevronLeft size={16} />
+            </Link>
+          ) : (
+            <span className="w-8 h-8 flex items-center justify-center rounded border border-outline-variant text-on-surface opacity-30">
+              <ChevronLeft size={16} />
+            </span>
+          )}
           <span className="px-3 py-1 rounded bg-primary text-on-primary font-sans text-xs">
-            1
+            {paginaActual}
           </span>
-          <button
-            type="button"
-            disabled={pedidos.length >= total}
-            className="w-8 h-8 flex items-center justify-center rounded border border-outline-variant text-on-surface disabled:opacity-30"
-          >
-            <ChevronRight size={16} />
-          </button>
+          {(paginaActual - 1) * porPagina + pedidos.length < total ? (
+            <Link
+              href={`/dashboard?page=${paginaActual + 1}`}
+              className="w-8 h-8 flex items-center justify-center rounded border border-outline-variant text-on-surface"
+            >
+              <ChevronRight size={16} />
+            </Link>
+          ) : (
+            <span className="w-8 h-8 flex items-center justify-center rounded border border-outline-variant text-on-surface opacity-30">
+              <ChevronRight size={16} />
+            </span>
+          )}
         </div>
       </div>
     </div>

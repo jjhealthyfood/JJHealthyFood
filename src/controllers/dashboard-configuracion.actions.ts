@@ -21,3 +21,11 @@ export async function guardarCodigoDescuento(clave: "codigo_descuento_5" | "codi
   await actualizarConfiguracion(supabase, clave, limpio);
   revalidatePath("/dashboard/configuracion");
 }
+
+export async function guardarLimiteComidasSemana(limite: number) {
+  if (!Number.isFinite(limite) || limite < 0) return;
+
+  const supabase = await createClient();
+  await actualizarConfiguracion(supabase, "limite_comidas_semana", String(Math.floor(limite)));
+  revalidatePath("/dashboard/configuracion");
+}

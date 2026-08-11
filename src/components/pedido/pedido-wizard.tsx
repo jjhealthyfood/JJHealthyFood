@@ -336,6 +336,7 @@ export function PedidoWizard({
   const [resumenVisitado, setResumenVisitado] = useState(false);
   const [mostrarAvisoCorte, setMostrarAvisoCorte] = useState(false);
   const [mostrarAvisoDuplicado, setMostrarAvisoDuplicado] = useState(false);
+  const [avisoLimite, setAvisoLimite] = useState<{ whatsappUrl: string } | null>(null);
   const [forzarProximaSemana, setForzarProximaSemana] = useState(false);
   const [mostrarModalDescuento, setMostrarModalDescuento] = useState(false);
   const [modalDescuentoVisto, setModalDescuentoVisto] = useState(false);
@@ -537,6 +538,9 @@ export function PedidoWizard({
       } else if (resultado.esDuplicado) {
         ventana?.close();
         setMostrarAvisoDuplicado(true);
+      } else if (resultado.esLimiteAlcanzado) {
+        ventana?.close();
+        setAvisoLimite({ whatsappUrl: resultado.whatsappSolicitudUrl ?? "" });
       } else {
         ventana?.close();
         setError(resultado.error);
@@ -786,6 +790,47 @@ export function PedidoWizard({
                 className="flex-1 bg-surface-container-high text-on-surface py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {avisoLimite && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 max-w-sm w-full space-y-4">
+            <div className="flex items-center gap-2 text-on-surface">
+              <AlertTriangle size={20} className="text-secondary" />
+              <h3 className="font-display text-lg font-semibold">
+                We&apos;re full for this weekend
+              </h3>
+            </div>
+            <p className="font-sans text-sm text-on-surface-variant">
+              We&apos;ve reached our meal capacity for this delivery weekend.
+              Message us on WhatsApp and we&apos;ll let you know if we can
+              make room for your order.
+            </p>
+            <p className="font-sans text-xs text-on-surface-variant bg-surface-container-high rounded-xl px-3 py-2">
+              Don&apos;t close or reload this page while you wait — your
+              meals are still saved here, so once we confirm you can just
+              tap send again.
+            </p>
+            <div className="flex gap-3">
+              <a
+                href={avisoLimite.whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setAvisoLimite(null)}
+                className="flex-1 text-center bg-primary text-on-primary py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
+              >
+                Message us
+              </a>
+              <button
+                type="button"
+                onClick={() => setAvisoLimite(null)}
+                className="flex-1 bg-surface-container-high text-on-surface py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
+              >
+                Close
               </button>
             </div>
           </div>

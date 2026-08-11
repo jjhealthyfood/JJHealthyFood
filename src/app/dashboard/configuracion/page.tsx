@@ -4,6 +4,7 @@ import { CambiarClaveForm } from "@/components/dashboard/cambiar-clave-form";
 import { WhatsappNumeroForm } from "@/components/dashboard/whatsapp-numero-form";
 import { SedesRetiroPanel } from "@/components/dashboard/sedes-retiro-panel";
 import { CodigosDescuentoForm } from "@/components/dashboard/codigos-descuento-form";
+import { LimiteComidasForm } from "@/components/dashboard/limite-comidas-form";
 import { obtenerConfiguracion } from "@/models/configuracion.model";
 import { listarSedes } from "@/models/sedes.model";
 
@@ -13,6 +14,7 @@ export default async function ConfiguracionPage() {
   let sedes: Awaited<ReturnType<typeof listarSedes>> = [];
   let codigo5 = "";
   let codigo10 = "";
+  let limiteComidasSemana = "250";
   let errorMsg: string | null = null;
 
   try {
@@ -26,6 +28,8 @@ export default async function ConfiguracionPage() {
     sedes = await listarSedes(supabase);
     codigo5 = (await obtenerConfiguracion(supabase, "codigo_descuento_5")) ?? "";
     codigo10 = (await obtenerConfiguracion(supabase, "codigo_descuento_10")) ?? "";
+    limiteComidasSemana =
+      (await obtenerConfiguracion(supabase, "limite_comidas_semana")) ?? "250";
   } catch {
     errorMsg = "No se pudo conectar con la base de datos.";
   }
@@ -113,6 +117,15 @@ export default async function ConfiguracionPage() {
             resumen de su pedido, para un 5% o 10% off.
           </p>
           <CodigosDescuentoForm codigo5={codigo5} codigo10={codigo10} />
+        </div>
+
+        {/* Límite de Comidas */}
+        <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6">
+          <h3 className="font-sans text-lg font-semibold text-on-surface mb-2 flex items-center gap-2">
+            <AlertTriangle size={20} />
+            Límite de Comidas
+          </h3>
+          <LimiteComidasForm limiteActual={limiteComidasSemana} />
         </div>
 
         {/* Información de Cuenta */}

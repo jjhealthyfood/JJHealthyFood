@@ -51,8 +51,12 @@ export async function crearPedido(
 
 export async function listarPedidosRecientes(
   supabase: SupabaseClient,
-  limite = 20
+  pagina = 1,
+  porPagina = 20
 ): Promise<{ pedidos: PedidoConDetalle[]; total: number }> {
+  const desde = (pagina - 1) * porPagina;
+  const hasta = desde + porPagina - 1;
+
   const { data, error, count } = await supabase
     .from("pedidos")
     .select(
@@ -60,7 +64,7 @@ export async function listarPedidosRecientes(
       { count: "exact" }
     )
     .order("fecha_pedido", { ascending: false })
-    .limit(limite);
+    .range(desde, hasta);
 
   if (error) throw error;
   return { pedidos: data as unknown as PedidoConDetalle[], total: count ?? 0 };
