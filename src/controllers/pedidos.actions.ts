@@ -445,89 +445,36 @@ export async function enviarPedido(
     const total = subtotal - (subtotal * descuentoPct) / 100;
     console.log("Subtotal (servidor):", subtotalServidor, "Subtotal (cliente):", subtotalCliente, "Usando:", subtotal, "Descuento:", descuentoPct, "Total:", total);
 
-    // Generar firma del pedido para prevencion de duplicados a nivel BD.
-    const comidasParaFirma = comidasConPreciosCorrectos.map((c) => ({
-      proteina: c.proteina,
-      carbohidrato: c.carbohidrato,
-      vegetal: c.vegetal ?? null,
-      extra: c.extra ?? null,
-      gramos_proteina: c.gramos_proteina !== null ? String(c.gramos_proteina) : "",
-      gramos_carbohidrato: c.gramos_carbohidrato !== null ? String(c.gramos_carbohidrato) : "",
-      es_desayuno: String(c.es_desayuno),
-    }));
-    const { data: firma, error: firmaError } = await supabase.rpc(
-      "generar_firma_pedido",
-      {
-        p_clienta_id: clientaId as string,
-        p_dia_entrega: datosEntrega.dia_entrega,
-        p_fecha_entrega: datosEntrega.fecha_entrega,
-        p_modo: modo,
-        p_comidas: comidasParaFirma,
-      }
+    console.log("Creando pedido...");
+    const pedido = await crearPedido(supabase, {
+      clienta_id: clientaId as string,
+      dia_entrega: datosEntrega.dia_entrega,
+      fecha_entrega: datosEntrega.fecha_entrega,
+      modo,
+      precio_total: total,
+      notas: datosEntrega.detalles.trim() || undefined,
+      tipo_entrega: datosEntrega.tipo_entrega,
+      sede_nombre: sedeElegida?.nombre ?? undefined,
+      sede_direccion: sedeElegida?.direccion ?? undefined,
+      direccion_entrega:
+        datosEntrega.tipo_entrega === "delivery"
+          ? datosEntrega.direccion_entrega.trim()
+          : undefined,
+      descuento_pct: descuentoPct,
+      codigo_descuento: descuentoPct > 0 ? codigoDescuento.trim() : undefined,
+    });
+
+    console.log("Pedido creado:", pedido.id);
+
+    console.log("Creando comidas...");
+    await crearComidasPedido(
+      supabase,
+      comidasConPreciosCorrectos.map((c) => ({ ...c, pedido_id: pedido.id }))
     );
 
-    if (firmaError || !firma) {
-      console.log("Error generando firma:", firmaError);
-      // Si falla la generacion de firma, continuar sin ella (el check
-      // de duplicado en JS ya paso).
-    }
+    console.log("Comidas creadas OK");
 
-    console.log("Creando pedido con prevencion atomica de duplicados...");
-    const pedidoId = crypto.randomUUID();
-
-    const comidasJsonb = comidasConPreciosCorrectos.map((c) => ({
-      proteina: c.proteina,
-      carbohidrato: c.carbohidrato,
-      vegetal: c.vegetal ?? null,
-      extra: c.extra ?? null,
-      gramos_proteina: c.gramos_proteina !== null ? String(c.gramos_proteina) : "",
-      gramos_carbohidrato: c.gramos_carbohidrato !== null ? String(c.gramos_carbohidrato) : "",
-      precio: String(c.precio),
-      es_desayuno: String(c.es_desayuno),
-      comentario: c.comentario ?? null,
-    }));
-
-    const { data: pedidoCreado, error: pedidoError } = await supabase.rpc(
-      "crear_pedido_si_no_duplicado",
-      {
-        p_id: pedidoId,
-        p_clienta_id: clientaId as string,
-        p_dia_entrega: datosEntrega.dia_entrega,
-        p_fecha_entrega: datosEntrega.fecha_entrega,
-        p_modo: modo,
-        p_precio_total: total,
-        p_notas: datosEntrega.detalles.trim() || null,
-        p_tipo_entrega: datosEntrega.tipo_entrega,
-        p_sede_nombre: sedeElegida?.nombre ?? null,
-        p_sede_direccion: sedeElegida?.direccion ?? null,
-        p_direccion_entrega:
-          datosEntrega.tipo_entrega === "delivery"
-            ? datosEntrega.direccion_entrega.trim()
-            : null,
-        p_descuento_pct: descuentoPct,
-        p_codigo_descuento: descuentoPct > 0 ? codigoDescuento.trim() : null,
-        p_firma: firma ?? null,
-        p_comidas: comidasJsonb,
-      }
-    );
-
-    if (pedidoError) {
-      const errorMsg = pedidoError.message || "";
-      if (errorMsg.includes("DUPLICATE_ORDER")) {
-        console.log("Pedido duplicado rechazado por BD");
-        return {
-          success: false,
-          error: "This looks like a duplicate order.",
-          esDuplicado: true,
-        };
-      }
-      console.log("Error al crear pedido:", pedidoError);
-      throw pedidoError;
-    }
-
-    console.log("Pedido creado:", pedidoCreado);
-
-    const numeroOrden = pedidoId.slice(0, 5).toUpperCase();
+    const numeroOrden = pedido.id.slice(0, 5).toUpperCase();
     const numeroNegocio =
       (await obtenerConfiguracion(supabase, "whatsapp_numero")) ??
       process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ??
