@@ -6,7 +6,8 @@ import { crearPedido } from "@/models/pedidos.model";
 import { crearComidasPedido } from "@/models/comidas-pedido.model";
 import { obtenerConfiguracion } from "@/models/configuracion.model";
 import { listarSedesActivas } from "@/models/sedes.model";
-import type { ComidaPedido, DiaEntrega, ModoPedido, TipoEntrega } from "@/models/types";
+import { listarOpcionesMenu, listarExtrasConfig } from "@/models/menu.model";
+import type { ComidaPedido, DiaEntrega, ModoPedido, OpcionMenu, TipoEntrega } from "@/models/types";
 
 export type DatosEntrega = {
   nombre: string;
@@ -135,6 +136,104 @@ async function validarCodigoDescuento(
   if (codigo10 && limpio.toLowerCase() === codigo10.toLowerCase()) return 10;
   if (codigo5 && limpio.toLowerCase() === codigo5.toLowerCase()) return 5;
   return 0;
+}
+
+const PRECIOS_MACRO: Record<string, number> = {
+  sencilla: 12,
+  premium: 14,
+};
+
+function precioComidaServidor(
+  c: ComidaSeleccionada,
+  modo: ModoPedido,
+  opcionesMenu: OpcionMenu[],
+  extrasConfig: { proteina_regular: number; proteina_premium: number; carbohidrato: number; vegetal: number }
+): number {
+  if (c.es_desayuno) {
+    const desayuno = opcionesMenu.find(
+      (o) => o.categoria === "desayuno" && o.nombre === c.proteina
+    );
+    if (!desayuno) return 0;
+    const precioBD = Number(desayuno.precio_racion);
+    return !isNaN(precioBD) && precioBD > 0 ? precioBD : 0;
+  }
+
+  if (!c.carbohidrato && !c.vegetal && !c.extra) {
+    // Podria ser un plato
+    const plato = opcionesMenu.find(
+      (o) => o.categoria === "plato" && o.nombre === c.proteina
+    );
+    if (plato) {
+      if (modo === "macro") {
+        const precioBD = Number(plato.precio_macro_gramo);
+        return !isNaN(precioBD) && precioBD > 0 ? precioBD : 12;
+      }
+      const precioBD = Number(plato.precio_racion);
+      return !isNaN(precioBD) && precioBD > 0 ? precioBD : 9;
+    }
+  }
+
+  const proteina = opcionesMenu.find(
+    (o) => o.categoria === "proteina" && o.nombre === c.proteina
+  );
+  if (!proteina) return 0;
+
+  let base = 0;
+  if (modo === "macro") {
+    const precioBD = Number(proteina.precio_macro_gramo);
+    if (!isNaN(precioBD) && precioBD > 0) {
+      base = precioBD;
+    } else {
+      const fallback = proteina.nivel ? PRECIOS_MACRO[proteina.nivel] : undefined;
+      base = fallback ?? 0;
+    }
+  } else {
+    const precioBD = Number(proteina.precio_racion);
+    if (!isNaN(precioBD) && precioBD > 0) base = precioBD;
+  }
+
+  let extra = 0;
+  if (c.extra) {
+    const nombresExtras = c.extra.split(", ");
+    for (const nombre of nombresExtras) {
+      const extraProteina = opcionesMenu.find(
+        (o) => o.categoria === "proteina" && o.nombre === nombre
+      );
+      if (extraProteina) {
+        if (extraProteina.extra_price_override !== null && extraProteina.extra_price_override !== undefined) {
+          extra += Number(extraProteina.extra_price_override);
+        } else {
+          extra += extraProteina.nivel === "premium"
+            ? extrasConfig.proteina_premium
+            : extrasConfig.proteina_regular;
+        }
+        continue;
+      }
+      const extraCarb = opcionesMenu.find(
+        (o) => o.categoria === "carbohidrato" && o.nombre === nombre
+      );
+      if (extraCarb) {
+        if (extraCarb.extra_price_override !== null && extraCarb.extra_price_override !== undefined) {
+          extra += Number(extraCarb.extra_price_override);
+        } else {
+          extra += extrasConfig.carbohidrato;
+        }
+        continue;
+      }
+      const extraVeg = opcionesMenu.find(
+        (o) => o.categoria === "vegetal" && o.nombre === nombre
+      );
+      if (extraVeg) {
+        if (extraVeg.extra_price_override !== null && extraVeg.extra_price_override !== undefined) {
+          extra += Number(extraVeg.extra_price_override);
+        } else {
+          extra += extrasConfig.vegetal;
+        }
+      }
+    }
+  }
+
+  return base + extra;
 }
 
 export async function validarCodigoDescuentoAction(
@@ -288,6 +387,10 @@ export async function enviarPedido(
     {
       p_telefono: datosEntrega.telefono,
       p_nombre: datosEntrega.nombre,
+      p_direccion:
+        datosEntrega.tipo_entrega === "delivery"
+          ? datosEntrega.direccion_entrega.trim()
+          : null,
     }
   );
 
@@ -316,41 +419,115 @@ export async function enviarPedido(
   }
 
   try {
-    const subtotal = comidas.reduce((suma, c) => suma + c.precio, 0);
+    // Recalcular precios en el servidor para evitar manipulacion del lado del cliente.
+    const [opcionesMenu, extrasConfig] = await Promise.all([
+      listarOpcionesMenu(supabase),
+      listarExtrasConfig(supabase),
+    ]);
+    const subtotalServidor = comidas.reduce(
+      (suma, c) => suma + precioComidaServidor(c, modo, opcionesMenu, extrasConfig),
+      0
+    );
+    const subtotalCliente = comidas.reduce((suma, c) => suma + c.precio, 0);
+    // Si el cliente envio precios diferentes a los del servidor, usar los del
+    // servidor (protege contra manipulacion). Se permite una diferencia minima
+    // de $0.01 por redondeo de punto flotante.
+    const subtotal = Math.abs(subtotalServidor - subtotalCliente) < 0.02
+      ? subtotalCliente
+      : subtotalServidor;
+    // Actualizar precios de cada comida con los valores del servidor para el
+    // mensaje de WhatsApp y el guardado en BD.
+    const comidasConPreciosCorrectos = comidas.map((c) => ({
+      ...c,
+      precio: precioComidaServidor(c, modo, opcionesMenu, extrasConfig),
+    }));
     const descuentoPct = await validarCodigoDescuento(supabase, codigoDescuento);
     const total = subtotal - (subtotal * descuentoPct) / 100;
-    console.log("Subtotal:", subtotal, "Descuento:", descuentoPct, "Total:", total);
+    console.log("Subtotal (servidor):", subtotalServidor, "Subtotal (cliente):", subtotalCliente, "Usando:", subtotal, "Descuento:", descuentoPct, "Total:", total);
 
-    console.log("Creando pedido...");
-    const pedido = await crearPedido(supabase, {
-      clienta_id: clientaId as string,
-      dia_entrega: datosEntrega.dia_entrega,
-      fecha_entrega: datosEntrega.fecha_entrega,
-      modo,
-      precio_total: total,
-      notas: datosEntrega.detalles.trim() || undefined,
-      tipo_entrega: datosEntrega.tipo_entrega,
-      sede_nombre: sedeElegida?.nombre ?? undefined,
-      sede_direccion: sedeElegida?.direccion ?? undefined,
-      direccion_entrega:
-        datosEntrega.tipo_entrega === "delivery"
-          ? datosEntrega.direccion_entrega.trim()
-          : undefined,
-      descuento_pct: descuentoPct,
-      codigo_descuento: descuentoPct > 0 ? codigoDescuento.trim() : undefined,
-    });
-
-    console.log("Pedido creado:", pedido.id);
-
-    console.log("Creando comidas...");
-    await crearComidasPedido(
-      supabase,
-      comidas.map((c) => ({ ...c, pedido_id: pedido.id }))
+    // Generar firma del pedido para prevencion de duplicados a nivel BD.
+    const comidasParaFirma = comidasConPreciosCorrectos.map((c) => ({
+      proteina: c.proteina,
+      carbohidrato: c.carbohidrato,
+      vegetal: c.vegetal ?? null,
+      extra: c.extra ?? null,
+      gramos_proteina: c.gramos_proteina !== null ? String(c.gramos_proteina) : "",
+      gramos_carbohidrato: c.gramos_carbohidrato !== null ? String(c.gramos_carbohidrato) : "",
+      es_desayuno: String(c.es_desayuno),
+    }));
+    const { data: firma, error: firmaError } = await supabase.rpc(
+      "generar_firma_pedido",
+      {
+        p_clienta_id: clientaId as string,
+        p_dia_entrega: datosEntrega.dia_entrega,
+        p_fecha_entrega: datosEntrega.fecha_entrega,
+        p_modo: modo,
+        p_comidas: comidasParaFirma,
+      }
     );
 
-    console.log("Comidas creadas OK");
+    if (firmaError || !firma) {
+      console.log("Error generando firma:", firmaError);
+      // Si falla la generacion de firma, continuar sin ella (el check
+      // de duplicado en JS ya paso).
+    }
 
-    const numeroOrden = pedido.id.slice(0, 5).toUpperCase();
+    console.log("Creando pedido con prevencion atomica de duplicados...");
+    const pedidoId = crypto.randomUUID();
+
+    const comidasJsonb = comidasConPreciosCorrectos.map((c) => ({
+      proteina: c.proteina,
+      carbohidrato: c.carbohidrato,
+      vegetal: c.vegetal ?? null,
+      extra: c.extra ?? null,
+      gramos_proteina: c.gramos_proteina !== null ? String(c.gramos_proteina) : "",
+      gramos_carbohidrato: c.gramos_carbohidrato !== null ? String(c.gramos_carbohidrato) : "",
+      precio: String(c.precio),
+      es_desayuno: String(c.es_desayuno),
+      comentario: c.comentario ?? null,
+    }));
+
+    const { data: pedidoCreado, error: pedidoError } = await supabase.rpc(
+      "crear_pedido_si_no_duplicado",
+      {
+        p_id: pedidoId,
+        p_clienta_id: clientaId as string,
+        p_dia_entrega: datosEntrega.dia_entrega,
+        p_fecha_entrega: datosEntrega.fecha_entrega,
+        p_modo: modo,
+        p_precio_total: total,
+        p_notas: datosEntrega.detalles.trim() || null,
+        p_tipo_entrega: datosEntrega.tipo_entrega,
+        p_sede_nombre: sedeElegida?.nombre ?? null,
+        p_sede_direccion: sedeElegida?.direccion ?? null,
+        p_direccion_entrega:
+          datosEntrega.tipo_entrega === "delivery"
+            ? datosEntrega.direccion_entrega.trim()
+            : null,
+        p_descuento_pct: descuentoPct,
+        p_codigo_descuento: descuentoPct > 0 ? codigoDescuento.trim() : null,
+        p_firma: firma ?? null,
+        p_comidas: comidasJsonb,
+      }
+    );
+
+    if (pedidoError) {
+      const errorMsg = pedidoError.message || "";
+      if (errorMsg.includes("DUPLICATE_ORDER")) {
+        console.log("Pedido duplicado rechazado por BD");
+        return {
+          success: false,
+          error: "This looks like a duplicate order.",
+          esDuplicado: true,
+        };
+      }
+      console.log("Error al crear pedido:", pedidoError);
+      throw pedidoError;
+    }
+
+    console.log("Pedido creado:", pedidoCreado);
+
+    const numeroOrden = pedidoId.slice(0, 5).toUpperCase();
     const numeroNegocio =
       (await obtenerConfiguracion(supabase, "whatsapp_numero")) ??
       process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ??
@@ -359,7 +536,7 @@ export async function enviarPedido(
       numeroOrden,
       datosEntrega,
       modo,
-      comidas,
+      comidasConPreciosCorrectos,
       subtotal,
       descuentoPct,
       sedeElegida?.nombre ?? null,
