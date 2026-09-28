@@ -6,15 +6,15 @@ import { SedesRetiroPanel } from "@/components/dashboard/sedes-retiro-panel";
 import { CodigosDescuentoForm } from "@/components/dashboard/codigos-descuento-form";
 import { LimiteComidasForm } from "@/components/dashboard/limite-comidas-form";
 import { obtenerConfiguracion } from "@/models/configuracion.model";
+import { obtenerListaDescuentos } from "@/models/codigos-descuento.model";
 import { listarSedes } from "@/models/sedes.model";
 
 export default async function ConfiguracionPage() {
   let user: { email?: string; id?: string } | null = null;
   let whatsappNumero = "";
   let sedes: Awaited<ReturnType<typeof listarSedes>> = [];
-  let codigo5 = "";
-  let codigo10 = "";
   let limiteComidasSemana = "250";
+  let listaDescuentos: Awaited<ReturnType<typeof obtenerListaDescuentos>> = [];
   let errorMsg: string | null = null;
 
   try {
@@ -26,8 +26,7 @@ export default async function ConfiguracionPage() {
       process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ??
       "";
     sedes = await listarSedes(supabase);
-    codigo5 = (await obtenerConfiguracion(supabase, "codigo_descuento_5")) ?? "";
-    codigo10 = (await obtenerConfiguracion(supabase, "codigo_descuento_10")) ?? "";
+    listaDescuentos = await obtenerListaDescuentos(supabase);
     limiteComidasSemana =
       (await obtenerConfiguracion(supabase, "limite_comidas_semana")) ?? "250";
   } catch {
@@ -114,9 +113,9 @@ export default async function ConfiguracionPage() {
           </h3>
           <p className="font-sans text-sm text-on-surface-variant mb-4">
             La clienta puede ingresar uno de estos códigos al llegar al
-            resumen de su pedido, para un 5% o 10% off.
+            resumen de su pedido. Agregá los que quieras con el porcentaje que prefieras.
           </p>
-          <CodigosDescuentoForm codigo5={codigo5} codigo10={codigo10} />
+          <CodigosDescuentoForm listaInicial={listaDescuentos} />
         </div>
 
         {/* Límite de Comidas */}

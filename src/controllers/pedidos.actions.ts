@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { crearPedido } from "@/models/pedidos.model";
 import { crearComidasPedido } from "@/models/comidas-pedido.model";
 import { obtenerConfiguracion } from "@/models/configuracion.model";
+import { obtenerListaDescuentos } from "@/models/codigos-descuento.model";
 import { listarSedesActivas } from "@/models/sedes.model";
 import { listarOpcionesMenu, listarExtrasConfig } from "@/models/menu.model";
 import type { ComidaPedido, DiaEntrega, ModoPedido, OpcionMenu, TipoEntrega } from "@/models/types";
@@ -128,13 +129,20 @@ async function validarCodigoDescuento(
   const limpio = codigo.trim();
   if (!limpio) return 0;
 
+  const limpioUpper = limpio.toUpperCase();
+
   const [codigo5, codigo10] = await Promise.all([
     obtenerConfiguracion(supabase, "codigo_descuento_5"),
     obtenerConfiguracion(supabase, "codigo_descuento_10"),
   ]);
 
-  if (codigo10 && limpio.toLowerCase() === codigo10.toLowerCase()) return 10;
-  if (codigo5 && limpio.toLowerCase() === codigo5.toLowerCase()) return 5;
+  if (codigo10 && limpioUpper === codigo10.toUpperCase()) return 10;
+  if (codigo5 && limpioUpper === codigo5.toUpperCase()) return 5;
+
+  const lista = await obtenerListaDescuentos(supabase);
+  const match = lista.find((c) => c.code.toUpperCase() === limpioUpper);
+  if (match) return match.pct;
+
   return 0;
 }
 

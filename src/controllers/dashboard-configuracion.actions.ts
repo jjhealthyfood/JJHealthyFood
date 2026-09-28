@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { actualizarConfiguracion } from "@/models/configuracion.model";
+import { guardarListaDescuentos } from "@/models/codigos-descuento.model";
 
 export async function guardarWhatsappNumero(numero: string) {
   const limpio = numero.replace(/[^0-9]/g, "");
@@ -27,5 +28,11 @@ export async function guardarLimiteComidasSemana(limite: number) {
 
   const supabase = await createClient();
   await actualizarConfiguracion(supabase, "limite_comidas_semana", String(Math.floor(limite)));
+  revalidatePath("/dashboard/configuracion");
+}
+
+export async function guardarListaDescuentoAction(lista: { pct: number; code: string }[]) {
+  const supabase = await createClient();
+  await guardarListaDescuentos(supabase, lista);
   revalidatePath("/dashboard/configuracion");
 }
