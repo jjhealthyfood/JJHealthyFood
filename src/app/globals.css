@@ -1,48 +1,48 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
-/* Paleta "Earth & Harvest" (JJ Healthy Food) - ver diseños en Stitch */
+/* Paleta "JJ Meals" (propuesta 2) */
 :root {
-  --primary: #33450d;
+  --primary: #2f6e00;
   --on-primary: #ffffff;
-  --primary-container: #4a5d23;
-  --on-primary-container: #bed58e;
+  --primary-container: #eaf4dc;
+  --on-primary-container: #17330a;
 
-  --secondary: #944a00;
+  --secondary: #b26a00;
   --on-secondary: #ffffff;
-  --secondary-container: #fc8f34;
-  --on-secondary-container: #663100;
+  --secondary-container: #fdc305;
+  --on-secondary-container: #17330a;
 
-  --tertiary: #37431b;
+  --tertiary: #4a5a3c;
   --on-tertiary: #ffffff;
-  --tertiary-container: #4e5b30;
-  --on-tertiary-container: #c2d29d;
+  --tertiary-container: #eaf4dc;
+  --on-tertiary-container: #17330a;
 
-  --primary-fixed: #d4eca2;
-  --primary-fixed-dim: #b8cf88;
-  --on-primary-fixed: #141f00;
-  --on-primary-fixed-variant: #3b4d14;
-  --secondary-fixed: #ffdcc5;
-  --secondary-fixed-dim: #ffb783;
-  --on-secondary-fixed: #301400;
-  --on-secondary-fixed-variant: #713700;
-  --tertiary-fixed: #d9e9b2;
-  --tertiary-fixed-dim: #bdcd98;
-  --on-tertiary-fixed: #141f00;
-  --on-tertiary-fixed-variant: #3e4b22;
+  --primary-fixed: #fff1b8;
+  --primary-fixed-dim: #eaf4dc;
+  --on-primary-fixed: #17330a;
+  --on-primary-fixed-variant: #2f6e00;
+  --secondary-fixed: #fdc305;
+  --secondary-fixed-dim: #ffd43b;
+  --on-secondary-fixed: #17330a;
+  --on-secondary-fixed-variant: #5b4a00;
+  --tertiary-fixed: #eaf4dc;
+  --tertiary-fixed-dim: #d9e9b2;
+  --on-tertiary-fixed: #17330a;
+  --on-tertiary-fixed-variant: #4a5a3c;
 
-  --surface: #fcf9ef;
-  --surface-dim: #dddad0;
-  --surface-bright: #fcf9ef;
+  --surface: #fffbea;
+  --surface-dim: #e6e2c8;
+  --surface-bright: #fffbea;
   --surface-container-lowest: #ffffff;
-  --surface-container-low: #f7f4e9;
-  --surface-container: #f1eee4;
-  --surface-container-high: #ebe8de;
-  --surface-container-highest: #e5e2d9;
-  --on-surface: #1c1c16;
-  --on-surface-variant: #45483c;
+  --surface-container-low: #fbf7e4;
+  --surface-container: #f5f0d9;
+  --surface-container-high: #ede9cf;
+  --surface-container-highest: #e6e2c8;
+  --on-surface: #17330a;
+  --on-surface-variant: #4a5a3c;
 
-  --outline: #76786b;
-  --outline-variant: #c6c8b8;
+  --outline: #9a9a7e;
+  --outline-variant: #e6e2c8;
 
   --error: #ba1a1a;
   --on-error: #ffffff;
@@ -104,8 +104,10 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
-  --font-display: var(--font-source-serif-4);
-  --font-sans: var(--font-manrope);
+  --font-display: var(--font-poppins-sans), sans-serif;
+  --font-sans: var(--font-dm-sans), sans-serif;
+  --font-poppins: var(--font-poppins-sans), sans-serif;
+  --font-dmsans: var(--font-dm-sans), sans-serif;
 }
 
 body {
@@ -121,6 +123,32 @@ body {
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* Accesibilidad: foco visible en todos los controles */
+:where(a, button, [role="button"], summary, input, select, textarea):focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+
+/* Anclas del landing debajo del header sticky */
+section[id] {
+  scroll-margin-top: 92px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @media print {

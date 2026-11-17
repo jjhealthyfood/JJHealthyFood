@@ -19,7 +19,7 @@ export function Sidebar() {
       <Link href="/dashboard" className="px-6 mb-10 flex items-center gap-3 hover:opacity-80 transition-opacity">
         <div className="w-12 h-12 shrink-0 rounded-xl bg-white flex items-center justify-center overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="JJ Healthy Food" className="w-10 h-10 object-contain" />
+          <img src="/brand/jj-meals-mark.png" alt="JJ Healthy Food" className="w-10 h-10 object-contain" />
         </div>
         <div>
           <h1 className="font-display text-xl font-semibold text-on-primary leading-tight">

@@ -19,7 +19,7 @@ export function LoginForm() {
           <div className="absolute inset-0 flex flex-col items-center justify-end pb-6 px-4">
             <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-4 shadow-xl shadow-primary/20 overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="JJ Healthy Food" className="w-14 h-14 object-contain" />
+              <img src="/brand/jj-meals-mark.png" alt="JJ Healthy Food" className="w-14 h-14 object-contain" />
             </div>
             <h1 className="font-display text-2xl font-semibold text-primary tracking-tight">
               JJ Healthy Food
@@ -37,7 +37,7 @@ export function LoginForm() {
             <div className="flex items-center gap-3 mb-2">
               <div className="w-12 h-12 bg-white border border-outline-variant rounded-xl flex items-center justify-center overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/logo.png" alt="JJ Healthy Food" className="w-10 h-10 object-contain" />
+                <img src="/brand/jj-meals-mark.png" alt="JJ Healthy Food" className="w-10 h-10 object-contain" />
               </div>
               <h1 className="font-display text-2xl font-semibold text-primary tracking-tight">
                 JJ Healthy Food

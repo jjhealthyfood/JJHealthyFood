@@ -1,20 +1,23 @@
 import type { Metadata } from "next";
-import { Manrope, Source_Serif_4 } from "next/font/google";
+import { DM_Sans, Poppins } from "next/font/google";
 import "./globals.css";
+import { Providers } from "@/components/providers";
 
-const manrope = Manrope({
-  variable: "--font-manrope",
+const poppins = Poppins({
+  variable: "--font-poppins-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
 });
 
-const sourceSerif4 = Source_Serif_4({
-  variable: "--font-source-serif-4",
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "JJ Healthy Food - Administración",
-  description: "Panel de administración de pedidos de JJ Healthy Food",
+  title: "JJ Meals — Fresh & Healthy Meal Prep in Florida",
+  description:
+    "Freshly prepared, fully customizable healthy meal prep. Choose pickup or delivery in Florida.",
   icons: {
     icon: "/favicon.svg",
   },
@@ -27,10 +30,12 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="es"
-      className={`${manrope.variable} ${sourceSerif4.variable} h-full antialiased`}
+      lang="en"
+      className={`${poppins.variable} ${dmSans.variable} h-full antialiased scroll-smooth`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col font-sans">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

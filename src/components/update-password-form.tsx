@@ -48,7 +48,7 @@ export function UpdatePasswordForm() {
           <div className="flex items-center gap-3 mb-8">
             <div className="w-12 h-12 bg-white border border-outline-variant rounded-xl flex items-center justify-center overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="JJ Healthy Food" className="w-10 h-10 object-contain" />
+              <img src="/brand/jj-meals-mark.png" alt="JJ Healthy Food" className="w-10 h-10 object-contain" />
             </div>
             <h1 className="font-display text-2xl font-semibold text-primary">
               JJ Healthy Food

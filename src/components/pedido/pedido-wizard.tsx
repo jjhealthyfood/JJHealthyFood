@@ -1,25 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import { useEffect, useState, useTransition } from "react";
 import {
   ChevronLeft,
-  MapPin,
-  Send,
   Clock,
   Leaf,
   Minus,
   Plus,
   Pencil,
-  CheckCircle2,
-  Star,
-  ChefHat,
-  Store,
-  Settings2,
   AlertTriangle,
   ChevronDown,
-  X,
-  Tag,
 } from "lucide-react";
 import { Chip } from "./chip";
 import {
@@ -207,12 +199,18 @@ function precioExtraDeItem(
   return 0;
 }
 
-function etiquetaPaso(paso: number, cantidad: number) {
-  if (paso === 0) return "Quantity";
-  if (paso === 1) return "Mode";
-  if (paso <= cantidad + 1) return `Meal ${paso - 1}`;
-  if (paso === cantidad + 2) return "Pickup";
-  return "Summary";
+function faseTexto(paso: number, cantidad: number) {
+  if (paso === 0) return "Step 1 of 4 · Order setup";
+  if (paso <= cantidad) return `Step 2 of 4 · Meal ${paso} of ${cantidad}`;
+  if (paso === cantidad + 1) return "Step 3 of 4 · Pickup & Delivery";
+  return "Step 4 of 4 · Summary & Checkout";
+}
+
+function porcentajeProgreso(paso: number, cantidad: number) {
+  if (paso === 0) return 25;
+  if (paso <= cantidad) return 25 + Math.round((paso / Math.max(1, cantidad)) * 25);
+  if (paso === cantidad + 1) return 75;
+  return 100;
 }
 
 function descripcionCorta(
@@ -313,11 +311,12 @@ export function PedidoWizard({
   extrasConfig?: ExtrasConfig;
   platos?: OpcionMenu[];
 }) {
-  const [iniciado, setIniciado] = useState(false);
   const [paso, setPaso] = useState(0);
   const [cantidad, setCantidad] = useState(1);
   const [modo, setModo] = useState<ModoPedido>("racion");
-  const [comidas, setComidas] = useState<ComidaSlot[]>([{ ...comidaVacia }]);
+  const [comidas, setComidas] = useState<ComidaSlot[]>([
+    { ...comidaVacia },
+  ]);
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
   const [detalles, setDetalles] = useState("");
@@ -333,6 +332,7 @@ export function PedidoWizard({
   const [enviando, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [enviado, setEnviado] = useState(false);
+  const [whatsappUrl, setWhatsappUrl] = useState("");
   const [resumenVisitado, setResumenVisitado] = useState(false);
   const [mostrarAvisoCorte, setMostrarAvisoCorte] = useState(false);
   const [mostrarAvisoDuplicado, setMostrarAvisoDuplicado] = useState(false);
@@ -345,12 +345,11 @@ export function PedidoWizard({
   const [errorCodigo, setErrorCodigo] = useState("");
   const [validandoCodigo, setValidandoCodigo] = useState(false);
 
-  const totalPasos = cantidad + 4; // cantidad + modo + N comidas + entrega + resumen
-  const esPasoCantidad = paso === 0;
-  const esPasoModo = paso === 1;
-  const esPasoComida = paso >= 2 && paso <= cantidad + 1;
-  const esPasoEntrega = paso === cantidad + 2;
-  const esPasoResumen = paso === cantidad + 3;
+  const totalPasos = cantidad + 3; // 0: setup, 1..N: comidas, N+1: entrega, N+2: resumen
+  const esPasoSetup = paso === 0;
+  const esPasoComida = paso >= 1 && paso <= cantidad;
+  const esPasoEntrega = paso === cantidad + 1;
+  const esPasoResumen = paso === cantidad + 2;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -414,9 +413,10 @@ export function PedidoWizard({
   }
 
   function puedeAvanzar() {
-    if (esPasoCantidad || esPasoModo) return true;
+    if (esPasoSetup) return true;
     if (esPasoComida) {
-      const c = comidas[paso - 2];
+      const c = comidas[paso - 1];
+      if (!c) return false;
       if (c.tipo === "desayuno") return Boolean(c.proteinaId);
       if (c.tipo === "plato") return Boolean(c.proteinaId);
       return Boolean(c.proteinaId && c.carbohidrato);
@@ -444,7 +444,7 @@ export function PedidoWizard({
     }
     const nuevoPaso = Math.min(paso + 1, totalPasos - 1);
 
-    if (!forzarProximaSemana && nuevoPaso === cantidad + 2 && !estaAntesDelCorte()) {
+    if (!forzarProximaSemana && nuevoPaso === cantidad + 1 && !estaAntesDelCorte()) {
       setMostrarAvisoCorte(true);
       return;
     }
@@ -530,6 +530,7 @@ export function PedidoWizard({
       );
       if (resultado.success) {
         setEnviado(true);
+        setWhatsappUrl(resultado.whatsappUrl ?? "");
         if (ventana) {
           ventana.location.href = resultado.whatsappUrl;
         } else {
@@ -548,67 +549,74 @@ export function PedidoWizard({
     });
   }
 
-  if (!iniciado) {
-    return (
-      <IntroScreen
-        onComenzar={() => setIniciado(true)}
-        opcionesDesayuno={opcionesDesayuno}
-      />
-    );
-  }
-
   return (
-    <main className="min-h-screen bg-surface flex flex-col">
-      <header className="flex items-center gap-3 px-4 h-16 border-b border-outline-variant/40">
-        <a href="/pedido" className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="JJ Healthy Food" className="w-9 h-9 object-contain" />
-          <div>
-            <h1 className="font-display text-base font-semibold text-primary leading-none">
-              JJ Healthy Food
-            </h1>
-            <p className="text-[11px] text-on-surface-variant uppercase tracking-widest mt-0.5">
-              Build Your Order
-            </p>
-          </div>
-        </a>
+    <main className="min-h-screen bg-[#FFFBEA] text-[#17330A] flex flex-col font-sans">
+      {/* Header */}
+      <header className="bg-white border-b-[1.5px] border-[#E6E2C8] sticky top-0 z-30">
+        <div className="max-w-[480px] mx-auto px-5 py-3 flex items-center justify-between gap-3">
+          <Link href="/" className="flex items-center gap-2.5 group">
+            <Image
+              src="/brand/jj-meals-mark.png"
+              alt="JJ Meals"
+              width={48}
+              height={48}
+              className="h-10 w-10 object-contain sm:h-11 sm:w-11"
+              priority
+            />
+            <div>
+              <div className="font-poppins font-extrabold text-[18px] text-[#2F6E00] leading-tight group-hover:text-[#17330A] transition-colors">
+                JJ Meals
+              </div>
+              <div className="text-[11px] font-bold tracking-[0.12em] text-[#4A5A3C] leading-none mt-0.5">
+                BUILD YOUR ORDER
+              </div>
+            </div>
+          </Link>
+
+          <span className="inline-flex items-center min-h-[36px] px-3 rounded-full bg-white border-[1.5px] border-[#CFCBA8] text-[#17330A] text-xs font-semibold">
+            <b className="text-[#2F6E00]">EN</b>&nbsp;·&nbsp;ES
+          </span>
+        </div>
       </header>
 
       {/* Progress */}
-      <div className="px-4 pt-4">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-xs font-sans font-semibold text-on-surface-variant">
-            Step {paso + 1} of {totalPasos} · {etiquetaPaso(paso, cantidad)}
-          </span>
+      {!enviado && (
+        <div className="max-w-[480px] w-full mx-auto px-5 pt-5 pb-1">
+          <div className="font-sans text-sm font-medium text-[#17330A] mb-2">
+            {faseTexto(paso, cantidad)}
+          </div>
+          <div className="h-2 rounded-full bg-[#EDE9CF] overflow-hidden">
+            <div
+              className="h-full bg-[#2F6E00] rounded-full transition-all duration-300"
+              style={{ width: `${porcentajeProgreso(paso, cantidad)}%` }}
+            />
+          </div>
         </div>
-        <div className="h-1.5 w-full bg-surface-container rounded-full overflow-hidden">
-          <div
-            className="h-full bg-primary transition-all duration-300"
-            style={{ width: `${((paso + 1) / totalPasos) * 100}%` }}
+      )}
+
+      <div className="flex-1 max-w-[480px] w-full mx-auto px-5 py-2">
+        {esPasoSetup && (
+          <PasoSetup
+            cantidad={cantidad}
+            modo={modo}
+            onCambiarCantidad={cambiarCantidad}
+            onCambiarModo={cambiarModo}
           />
-        </div>
-      </div>
-
-      <div className="flex-1 px-4 py-6 max-w-lg w-full mx-auto">
-        {esPasoCantidad && (
-          <PasoCantidad cantidad={cantidad} onCambiar={cambiarCantidad} />
         )}
-
-        {esPasoModo && <PasoModo modo={modo} onCambiar={cambiarModo} />}
 
         {esPasoComida && (
           <ResumenParcial
-            comidas={comidas.slice(0, paso - 2)}
+            comidas={comidas.slice(0, paso - 1)}
             proteinas={proteinas}
             platos={platos}
-            onEditar={(i) => setPaso(i + 2)}
+            onEditar={(i) => setPaso(i + 1)}
           />
         )}
 
         {esPasoComida && (
           <PasoComida
-            numero={paso - 1}
-            comida={comidas[paso - 2]}
+            numero={paso}
+            comida={comidas[paso - 1]}
             modo={modo}
             proteinas={proteinas}
             carbohidratos={carbohidratos}
@@ -616,7 +624,7 @@ export function PedidoWizard({
             carbohidratosFull={carbohidratosFull}
             vegetalesFull={vegetalesFull}
             opcionesDesayuno={opcionesDesayuno}
-            onCambiar={(cambios) => actualizarComida(paso - 2, cambios)}
+            onCambiar={(cambios) => actualizarComida(paso - 1, cambios)}
             extrasConfig={extrasConfig}
             platos={platos}
           />
@@ -652,7 +660,6 @@ export function PedidoWizard({
             proteinas={proteinas}
             opcionesDesayuno={opcionesDesayuno}
             nombre={nombre}
-            detalles={detalles}
             diaEntrega={diaEntrega}
             sede={sedes.find((s) => s.id === sedeId) ?? null}
             tipoEntrega={tipoEntrega}
@@ -670,6 +677,28 @@ export function PedidoWizard({
           />
         )}
 
+        {enviado && (
+          <PasoConfirmacion
+            comidas={comidasActivas}
+            modo={modo}
+            nombre={nombre}
+            telefono={telefono}
+            detalles={detalles}
+            diaEntrega={diaEntrega}
+            sede={sedes.find((s) => s.id === sedeId) ?? null}
+            tipoEntrega={tipoEntrega}
+            direccionEntrega={direccionEntrega}
+            total={total}
+            whatsappUrl={whatsappUrl}
+            onStartNewOrder={() => {
+              setEnviado(false);
+              setWhatsappUrl("");
+              setPaso(0);
+              window.location.href = "/pedido";
+            }}
+          />
+        )}
+
         {error && (
           <p className="mt-4 text-sm text-error font-sans" role="alert">
             {error}
@@ -677,43 +706,56 @@ export function PedidoWizard({
         )}
       </div>
 
-      {/* Bottom navigation bar */}
-      <div className="sticky bottom-0 bg-surface border-t border-outline-variant/40 px-4 py-4 flex items-center gap-3">
-        {paso > 0 && !enviado && (
-          <button
-            type="button"
-            onClick={atras}
-            className="flex items-center gap-1 px-4 py-3 text-on-surface-variant font-sans text-sm font-semibold"
-          >
-            <ChevronLeft size={18} />
-            Back
-          </button>
-        )}
-        {!esPasoResumen ? (
-          <button
-            type="button"
-            onClick={siguiente}
-            disabled={!puedeAvanzar()}
-            className="flex-1 bg-primary text-on-primary py-3 rounded-2xl font-sans text-sm font-semibold disabled:opacity-40 active:scale-95 transition-all"
-          >
-            {resumenVisitado ? "Back to summary" : "Next"}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => enviar()}
-            disabled={enviando || enviado}
-            className="flex-1 bg-secondary text-on-secondary py-3 rounded-2xl font-sans text-sm font-semibold disabled:opacity-60 active:scale-95 transition-all flex items-center justify-center gap-2"
-          >
-            <Send size={18} />
-            {enviando
-              ? "Sending..."
-              : enviado
-                ? "Done! Check the WhatsApp tab"
-                : "Send order via WhatsApp"}
-          </button>
-        )}
-      </div>
+      {!enviado && (
+        <>
+          {/* Bottom navigation bar */}
+          <div className="sticky bottom-0 bg-white border-t-[1.5px] border-[#E6E2C8] px-5 py-3.5 z-30 shadow-xs">
+        <div className="max-w-[480px] mx-auto flex items-center justify-between gap-3">
+          <div className="flex flex-col leading-tight">
+            <span className="text-[11px] font-bold tracking-[0.06em] text-[#4A5A3C]">
+              ORDER TOTAL
+            </span>
+            <span className="font-poppins font-extrabold text-xl text-[#17330A]">
+              {formatearMoneda(total)}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-1 justify-end">
+            {paso > 0 && !enviado && (
+              <button
+                type="button"
+                onClick={atras}
+                className="min-h-[48px] px-3 text-[#4A5A3C] hover:text-[#17330A] font-medium text-sm flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
+              >
+                <ChevronLeft size={18} />
+                Back
+              </button>
+            )}
+
+            {!esPasoResumen ? (
+              <button
+                type="button"
+                onClick={siguiente}
+                disabled={!puedeAvanzar()}
+                className="flex-1 max-w-[200px] min-h-[52px] rounded-full bg-[#FDC305] hover:bg-[#FFD43B] text-[#17330A] font-poppins font-bold text-[17px] flex items-center justify-center transition-all active:scale-95 shadow-2xs disabled:bg-[#D9D5B8] disabled:text-[#3F4635] disabled:cursor-not-allowed cursor-pointer"
+              >
+                {resumenVisitado ? "Summary" : "Next"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => enviar()}
+                disabled={enviando || enviado}
+                className="flex-1 max-w-[240px] min-h-[52px] rounded-full bg-[#FDC305] hover:bg-[#FFD43B] text-[#17330A] font-poppins font-bold text-[15px] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-2xs disabled:bg-[#D9D5B8] disabled:text-[#3F4635] disabled:cursor-not-allowed cursor-pointer"
+              >
+                Send via WhatsApp
+              </button>
+            )}
+          </div>
+        </div>
+          </div>
+        </>
+      )}
 
       {mostrarAvisoCorte && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
@@ -838,25 +880,13 @@ export function PedidoWizard({
       )}
 
       {mostrarModalDescuento && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-surface-container-lowest rounded-2xl border border-outline-variant p-6 max-w-sm w-full space-y-4 relative">
-            <button
-              type="button"
-              onClick={() => setMostrarModalDescuento(false)}
-              className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface"
-              aria-label="Close"
-            >
-              <X size={18} />
-            </button>
-            <div className="flex items-center gap-2 text-on-surface pr-6">
-              <Tag size={20} className="text-secondary" />
-              <h3 className="font-display text-lg font-semibold">
-                Have a discount code?
-              </h3>
-            </div>
-            <p className="font-sans text-sm text-on-surface-variant">
-              Enter it below, or close this to continue without one.
-            </p>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#17330A]/55 px-4 pb-4">
+          <div className="w-full max-w-[390px] rounded-t-[24px] bg-white p-[12px_20px_28px] shadow-xl">
+            <div className="w-[44px] h-[5px] rounded-[999px] bg-[#CFCBA8] mx-auto mb-16" />
+            <h2 className="font-display text-[22px] font-extrabold text-[#17330A] mb-6 text-center">
+              Discount code
+            </h2>
+            <div className="lbl text-center">ENTER YOUR CODE</div>
             <input
               type="text"
               value={codigoDescuento}
@@ -865,19 +895,28 @@ export function PedidoWizard({
                 setErrorCodigo("");
               }}
               onKeyDown={(e) => e.key === "Enter" && aplicarCodigoDescuento()}
-              placeholder="Discount code"
-              className="w-full h-12 px-4 bg-surface-container border border-outline-variant rounded-xl font-sans focus:ring-2 focus:ring-primary outline-none"
+              placeholder="e.g. [CÓDIGO]"
+              className="w-full min-h-[48px] px-0 py-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150] text-center"
             />
             {errorCodigo && (
-              <p className="text-xs text-error font-sans">{errorCodigo}</p>
+              <p className="text-xs text-error font-sans mt-2 text-center">
+                {errorCodigo}
+              </p>
             )}
             <button
               type="button"
               onClick={aplicarCodigoDescuento}
               disabled={validandoCodigo || !codigoDescuento.trim()}
-              className="w-full bg-primary text-on-primary py-3 rounded-2xl font-sans text-sm font-semibold disabled:opacity-50 active:scale-95 transition-all"
+              className="w-full min-h-[52px] rounded-[999px] bg-[#FDC305] hover:bg-[#FFD43B] text-[#17330A] font-poppins font-bold text-[17px] flex items-center justify-center mt-4 transition-all active:scale-95 disabled:bg-[#D9D5B8] disabled:text-[#3F4635] disabled:cursor-not-allowed cursor-pointer"
             >
               {validandoCodigo ? "Checking..." : "Apply code"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMostrarModalDescuento(false)}
+              className="w-full text-center mt-[12px] min-h-[44px] font-medium text-[#17330A] flex items-center justify-center cursor-pointer"
+            >
+              Cancel
             </button>
           </div>
         </div>
@@ -886,95 +925,129 @@ export function PedidoWizard({
   );
 }
 
-function PasoCantidad({
+function PasoSetup({
   cantidad,
-  onCambiar,
+  modo,
+  onCambiarCantidad,
+  onCambiarModo,
 }: {
   cantidad: number;
-  onCambiar: (n: number) => void;
+  modo: ModoPedido;
+  onCambiarCantidad: (n: number) => void;
+  onCambiarModo: (m: ModoPedido) => void;
 }) {
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="font-display text-2xl font-semibold text-on-surface">
-          How many meals do you want?
-        </h2>
-        <p className="text-on-surface-variant font-sans text-sm mt-1">
-          Choose how many meals for this order.
-        </p>
-      </div>
+    <div className="pb-8 animate-in fade-in duration-200">
+      <h2 className="font-poppins text-[30px] font-extrabold text-[#17330A] mt-4 sm:mt-6 tracking-tight leading-tight">
+        Build your order
+      </h2>
 
-      <div className="flex items-center justify-center gap-6">
+      {/* Meals count */}
+      <div className="text-xs font-bold tracking-[0.08em] text-[#4A5A3C] uppercase mt-7 mb-2">
+        HOW MANY MEALS DO YOU WANT?
+      </div>
+      <div className="flex items-center justify-center gap-8 my-3">
         <button
           type="button"
-          onClick={() => onCambiar(cantidad - 1)}
+          onClick={() => onCambiarCantidad(cantidad - 1)}
           disabled={cantidad <= 1}
-          className="w-12 h-12 rounded-full bg-surface-container-lowest border border-outline-variant flex items-center justify-center disabled:opacity-30 active:scale-95 transition-all"
+          aria-label="Decrease meals"
+          className="w-14 h-14 rounded-full border-[1.5px] border-[#CFCBA8] bg-white flex items-center justify-center text-[28px] text-[#17330A] disabled:opacity-30 hover:bg-neutral-50 active:scale-95 transition-all cursor-pointer disabled:cursor-not-allowed shadow-2xs select-none"
         >
-          <Minus size={20} />
+          −
         </button>
-        <span className="font-display text-4xl font-semibold text-primary w-16 text-center">
+        <span className="font-poppins font-extrabold text-[56px] text-[#2F6E00] w-20 text-center select-none leading-none">
           {cantidad}
         </span>
         <button
           type="button"
-          onClick={() => onCambiar(cantidad + 1)}
-          className="w-12 h-12 rounded-full bg-primary text-on-primary flex items-center justify-center active:scale-95 transition-all"
+          onClick={() => onCambiarCantidad(cantidad + 1)}
+          aria-label="Increase meals"
+          className="w-14 h-14 rounded-full bg-[#2F6E00] text-white flex items-center justify-center text-[28px] hover:bg-[#255700] active:scale-95 transition-all cursor-pointer shadow-xs select-none"
         >
-          <Plus size={20} />
+          +
         </button>
       </div>
-    </div>
-  );
-}
 
-function PasoModo({
-  modo,
-  onCambiar,
-}: {
-  modo: ModoPedido;
-  onCambiar: (m: ModoPedido) => void;
-}) {
-  return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="font-display text-2xl font-semibold text-on-surface">
-          How do you want your meals?
-        </h2>
-        <p className="text-on-surface-variant font-sans text-sm mt-1">
-          This applies to every meal in this order.
-        </p>
+      {/* How do you want your meals */}
+      <div className="text-xs font-bold tracking-[0.08em] text-[#4A5A3C] uppercase mt-7 mb-1">
+        HOW DO YOU WANT YOUR MEALS?
       </div>
+      <p className="font-sans text-sm text-[#17330A]/80 m-0 mb-3 leading-relaxed">
+        This applies to every meal in this order.
+      </p>
 
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         <button
           type="button"
-          onClick={() => onCambiar("racion")}
-          className={`w-full text-left p-4 rounded-2xl border-2 transition-colors ${
+          onClick={() => onCambiarModo("racion")}
+          className={`w-full text-left p-4 rounded-[16px] transition-all cursor-pointer flex items-center justify-between ${
             modo === "racion"
-              ? "border-primary bg-primary/10"
-              : "border-outline-variant bg-surface-container-lowest"
+              ? "border-2 border-[#2F6E00] bg-[#EAF4DC]"
+              : "border-[1.5px] border-[#CFCBA8] bg-white hover:border-[#2F6E00]/60"
           }`}
         >
-          <p className="font-sans font-semibold text-on-surface">By Portion</p>
-          <p className="text-sm text-on-surface-variant mt-0.5">
-            Standard portion of protein, carb, and veggie.
-          </p>
+          <div>
+            <div className="font-sans font-bold text-[17px] text-[#17330A]">
+              By Portion
+            </div>
+            <div className="text-sm text-[#4A5A3C] mt-1">
+              Standard portion of protein, carb, and veggie.
+            </div>
+          </div>
+          {modo === "racion" && (
+            <span className="text-[#2F6E00] font-extrabold text-xl ml-3">✓</span>
+          )}
         </button>
+
         <button
           type="button"
-          onClick={() => onCambiar("macro")}
-          className={`w-full text-left p-4 rounded-2xl border-2 transition-colors ${
+          onClick={() => onCambiarModo("macro")}
+          className={`w-full text-left p-4 rounded-[16px] transition-all cursor-pointer flex items-center justify-between ${
             modo === "macro"
-              ? "border-primary bg-primary/10"
-              : "border-outline-variant bg-surface-container-lowest"
+              ? "border-2 border-[#2F6E00] bg-[#EAF4DC]"
+              : "border-[1.5px] border-[#CFCBA8] bg-white hover:border-[#2F6E00]/60"
           }`}
         >
-          <p className="font-sans font-semibold text-on-surface">Macro</p>
-          <p className="text-sm text-on-surface-variant mt-0.5">
-            Adjustable protein amount for your macros.
-          </p>
+          <div>
+            <div className="font-sans font-bold text-[17px] text-[#17330A]">
+              Macro
+            </div>
+            <div className="text-sm text-[#4A5A3C] mt-1">
+              Adjustable protein amount for your macros.
+            </div>
+          </div>
+          {modo === "macro" && (
+            <span className="text-[#2F6E00] font-extrabold text-xl ml-3">✓</span>
+          )}
         </button>
+
+        <button
+          type="button"
+          onClick={() => onCambiarModo("keto")}
+          className={`w-full text-left p-4 rounded-[16px] transition-all cursor-pointer flex items-center justify-between ${
+            modo === "keto"
+              ? "border-2 border-[#2F6E00] bg-[#EAF4DC]"
+              : "border-[1.5px] border-[#CFCBA8] bg-white hover:border-[#2F6E00]/60"
+          }`}
+        >
+          <div>
+            <div className="font-sans font-bold text-[17px] text-[#17330A]">
+              Keto
+            </div>
+            <div className="text-sm text-[#4A5A3C] mt-1">
+              Low-carb protein and keto-friendly meals.
+            </div>
+          </div>
+          {modo === "keto" && (
+            <span className="text-[#2F6E00] font-extrabold text-xl ml-3">✓</span>
+          )}
+        </button>
+      </div>
+
+      {/* Note */}
+      <div className="mt-5 p-4 rounded-[16px] bg-[#EAF4DC] text-[#17330A] text-[15px] font-medium leading-relaxed border border-[#CFCBA8]/40">
+        Orders open Tuesday through Friday 6pm for that week.
       </div>
     </div>
   );
@@ -1008,8 +1081,15 @@ function PasoComida({
   platos?: OpcionMenu[];
 }) {
   const esDesayuno = comida.tipo === "desayuno";
-  const sencillas = proteinas.filter((p) => p.nivel === "sencilla");
-  const premium = proteinas.filter((p) => p.nivel === "premium");
+  const platosFiltrados = modo === "keto"
+    ? (platos ?? []).filter((o) => o.es_keto)
+    : platos;
+  const sencillas = modo === "keto"
+    ? proteinas.filter((p) => p.es_keto && p.nivel === "sencilla")
+    : proteinas.filter((p) => p.nivel === "sencilla");
+  const premium = modo === "keto"
+    ? proteinas.filter((p) => p.es_keto && p.nivel === "premium")
+    : proteinas.filter((p) => p.nivel === "premium");
 
   return (
     <div className="space-y-8">
@@ -1056,7 +1136,7 @@ function PasoComida({
               </p>
             </div>
             <div className="flex flex-col gap-2">
-              {platos.map((o) => {
+              {platosFiltrados.map((o) => {
                 const precio = modo === "macro"
                   ? (Number(o.precio_macro_gramo) || 12)
                   : (Number(o.precio_racion) || 9);
@@ -1501,14 +1581,16 @@ function PasoEntrega({
   const telefonoInvalido =
     telefono.trim().length > 0 && !TELEFONO_US_REGEX.test(telefono.trim());
   const sedeElegida = sedes.find((s) => s.id === sedeId) ?? null;
+  const lblTitulo = tipoEntrega === "delivery" ? "DELIVERY ADDRESS" : "PICKUP LOCATION";
+  const lblDia = tipoEntrega === "delivery" ? "DELIVERY DAY" : "PICKUP DAY";
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-display text-2xl font-semibold text-on-surface">
+        <h2 className="font-display text-[30px] font-extrabold text-[#17330A] mt-4 leading-tight">
           {tipoEntrega === "delivery" ? "Delivery details" : "Pickup details"}
         </h2>
-        <p className="text-on-surface-variant font-sans text-sm mt-1">
+        <p className="sub">
           We need these to coordinate your {tipoEntrega === "delivery" ? "delivery" : "pickup"}.
         </p>
       </div>
@@ -1519,14 +1601,14 @@ function PasoEntrega({
         </p>
       )}
 
-      <div className="flex gap-1 bg-surface-container rounded-xl p-1">
+      <div className="mt-4 flex gap-[4px] rounded-[999px] bg-[#EDE9CF] p-[4px]">
         <button
           type="button"
           onClick={() => onTipoEntregaChange("pickup")}
-          className={`flex-1 py-2.5 px-3 rounded-lg font-sans text-sm font-semibold transition-colors ${
+          className={`flex-1 min-h-[44px] rounded-[999px] text-[15px] font-medium transition-colors ${
             tipoEntrega === "pickup"
-              ? "bg-primary text-on-primary"
-              : "text-on-surface-variant hover:bg-surface-container-high"
+              ? "bg-[#2F6E00] text-white"
+              : "bg-transparent text-[#17330A]"
           }`}
         >
           Pickup
@@ -1534,140 +1616,158 @@ function PasoEntrega({
         <button
           type="button"
           onClick={() => onTipoEntregaChange("delivery")}
-          className={`flex-1 py-2.5 px-3 rounded-lg font-sans text-sm font-semibold transition-colors ${
+          className={`flex-1 min-h-[44px] rounded-[999px] text-[15px] font-medium transition-colors ${
             tipoEntrega === "delivery"
-              ? "bg-primary text-on-primary"
-              : "text-on-surface-variant hover:bg-surface-container-high"
+              ? "bg-[#2F6E00] text-white"
+              : "bg-transparent text-[#17330A] font-medium"
           }`}
         >
           Delivery
         </button>
       </div>
 
+      <div className="mt-4 rounded-[16px] bg-[#EAF4DC] p-[14px_16px] text-[15px]">
+        Orders open Tuesday through Friday 6pm for that week.
+      </div>
+
+      <div className="lbl">{
+        lblTitulo
+      }</div>
+
       {tipoEntrega === "delivery" ? (
         <div className="space-y-2">
-          <label className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-            Delivery address
-          </label>
-          <textarea
-            value={direccionEntrega}
-            onChange={(e) => onDireccionEntregaChange(e.target.value)}
-            placeholder="123 Main St, Orlando, FL 32801"
-            rows={2}
-            className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant rounded-xl font-sans focus:ring-2 focus:ring-primary outline-none resize-none"
-          />
-          <p className="text-xs text-on-surface-variant font-sans">
-            We currently only deliver within Florida.
-          </p>
-          {direccionEntrega.trim().length > 0 &&
-            !esDireccionFloridaValida(direccionEntrega) && (
-              <p className="text-xs text-error font-sans">
-                Please enter a full Florida address with a valid FL zip code.
-              </p>
-            )}
+          <div
+            className="in mt-[8px]"
+          >
+            <input
+              type="text"
+              value={direccionEntrega}
+              onChange={(e) => onDireccionEntregaChange(e.target.value)}
+              placeholder="Street address"
+              className="w-full h-full px-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150]"
+            />
+          </div>
+          <div
+            className="in"
+          >
+            <input
+              type="text"
+              placeholder="Apt / unit (optional)"
+              className="w-full h-full px-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150]"
+            />
+          </div>
+          <div className="note mt-4 p-[14px_16px] bg-[#EAF4DC] text-[15px]">
+            [TARIFA O ZONA DE ENTREGA]
+          </div>
         </div>
       ) : sedes.length > 1 ? (
-        <div className="space-y-2">
-          <label className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-            Pickup location
-          </label>
-          <div className="space-y-3">
-            {sedes.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => onSedeChange(s.id)}
-                className={`w-full text-left p-4 rounded-2xl border-2 transition-colors ${
-                  sedeId === s.id
-                    ? "border-primary bg-primary/10"
-                    : "border-outline-variant bg-surface-container-lowest"
-                }`}
-              >
-                <p className="font-sans text-sm text-on-surface flex items-start gap-1.5">
-                  <MapPin size={14} className="shrink-0 mt-0.5" />
-                  {s.direccion}
-                </p>
-              </button>
-            ))}
-          </div>
+        <div className="space-y-3">
+          {sedes.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => onSedeChange(s.id)}
+              className={`opt flex items-center gap-12 min-h-[56px] px-4 py-[10px_14px] rounded-[16px] border-[1.5px] text-[15px] transition-colors ${
+                sedeId === s.id
+                  ? "border-[#2F6E00] bg-[#EAF4DC]"
+                  : "border-[#CFCBA8] bg-white hover:border-[#2F6E00]/60"
+              }`}
+            >
+              <div className="th flex-none w-[56px] h-[56px] rounded-[12px] bg-[#FFF1B8]" />
+              <div className="flex-1">
+                <div className="font-bold">{s.direccion}</div>
+              </div>
+              {sedeId === s.id && <span className="text-[#2F6E00] font-extrabold">✓</span>}
+            </button>
+          ))}
         </div>
       ) : (
         sedeElegida && (
-          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-primary/10 text-primary">
-            <MapPin size={18} className="shrink-0 mt-0.5" />
-            <p className="font-sans text-sm font-semibold">
-              {sedeElegida.direccion}
-            </p>
+          <div className="opt flex items-center gap-12 min-h-[56px] px-4 py-[10px_14px] rounded-[16px] border-[1.5px] border-[#2F6E00] bg-[#EAF4DC] text-[15px]">
+            <div className="th flex-none w-[56px] h-[56px] rounded-[12px] bg-[#FFF1B8]" />
+            <div className="flex-1">
+              <div className="font-bold">{sedeElegida.direccion}</div>
+            </div>
+            <span className="text-[#2F6E00] font-extrabold">✓</span>
           </div>
         )
       )}
 
-      <div className="space-y-2">
-        <label className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-          Phone
-        </label>
+      <div className="lbl mt-[20px]">PHONE</div>
+      <div className="in relative">
         <input
           type="tel"
           value={telefono}
           onChange={(e) => onTelefonoChange(e.target.value)}
           onBlur={onTelefonoBlur}
           placeholder="(555) 123-4567"
-          className="w-full h-12 px-4 bg-surface-container-lowest border border-outline-variant rounded-xl font-sans focus:ring-2 focus:ring-primary outline-none"
+          className="w-full h-full px-0 py-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150]"
         />
         {telefonoInvalido && (
-          <p className="text-xs text-error font-sans">
+          <p className="text-xs text-error font-sans mt-2">
             Please enter a valid US phone number.
           </p>
         )}
       </div>
 
-      <div className="space-y-2">
-        <label className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-          Name
-        </label>
+      <div className="lbl mt-[20px]">NAME</div>
+      <div className="in">
         <input
           type="text"
           value={nombre}
           onChange={(e) => onNombreChange(e.target.value)}
           placeholder="Your full name"
-          className="w-full h-12 px-4 bg-surface-container-lowest border border-outline-variant rounded-xl font-sans focus:ring-2 focus:ring-primary outline-none"
+          className="w-full h-full px-0 py-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150]"
         />
       </div>
 
-      <div className="space-y-2">
-        <label className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-          Additional details (optional)
-        </label>
+      <div className="lbl mt-[20px]">ADDITIONAL DETAILS (OPTIONAL)</div>
+      <div
+        className="in min-h-[72px] mt-[8px] align-[flex-start] pt-[12px] relative"
+      >
         <textarea
           value={detalles}
           onChange={(e) => onDetallesChange(e.target.value)}
           placeholder={`Anything we should know about your ${tipoEntrega === "delivery" ? "delivery" : "pickup"}?`}
           rows={2}
-          className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant rounded-xl font-sans focus:ring-2 focus:ring-primary outline-none resize-none"
+          className="w-full h-full px-0 py-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none resize-none placeholder:text-[#5B6150]"
         />
       </div>
 
-      <div className="space-y-2">
-        <label className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-          {tipoEntrega === "delivery" ? "Delivery day" : "Pickup day"}
-        </label>
-        {forzarProximaSemana && (
-          <p className="text-xs text-secondary font-sans font-semibold bg-secondary/10 rounded-lg px-3 py-1.5">
-            Scheduling for next week
-          </p>
-        )}
-        <div className="flex gap-3">
-          <Chip
-            label={etiquetaFecha(proximaFecha(0, forzarProximaSemana))}
-            selected={diaEntrega === "domingo"}
-            onClick={() => onDiaChange("domingo")}
-          />
-          <Chip
-            label={etiquetaFecha(proximaFecha(1, forzarProximaSemana))}
-            selected={diaEntrega === "lunes"}
-            onClick={() => onDiaChange("lunes")}
-          />
-        </div>
+      <div className="lbl mt-[20px]">{lblDia}</div>
+      {forzarProximaSemana && (
+        <p className="text-[12px] font-bold text-secondary bg-secondary/10 rounded-lg px-3 py-[1.5px] mt-[8px]">
+          Scheduling for next week
+        </p>
+      )}
+      <div className="row mt-[8px] flex gap-8 flex-wrap">
+        <Chip
+          label={etiquetaFecha(proximaFecha(0, forzarProximaSemana))}
+          selected={diaEntrega === "domingo"}
+          onClick={() => onDiaChange("domingo")}
+          classNameOverride={`${
+            diaEntrega === "domingo"
+              ? "bg-[#2F6E00] border-[#2F6E00] text-white font-bold"
+              : "bg-white border-[#CFCBA8] text-[#17330A] font-medium"
+          }`}
+        />
+        <Chip
+          label={etiquetaFecha(proximaFecha(1, forzarProximaSemana))}
+          selected={diaEntrega === "lunes"}
+          onClick={() => onDiaChange("lunes")}
+          classNameOverride={`${
+            diaEntrega === "lunes"
+              ? "bg-[#2F6E00] border-[#2F6E00] text-white font-bold"
+              : "bg-white border-[#CFCBA8] text-[#17330A] font-medium"
+          }`}
+        />
+      </div>
+
+      <div className="chk mt-[24px] flex items-center justify-between">
+        <span className="font-bold text-[13px] tracking-[0.06em] text-[#17330A]">
+          REMEMBER MY DETAILS FOR NEXT TIME
+        </span>
+        <div className="box w-[28px] h-[28px] rounded-[8px] border-[2px] border-[#17330A] bg-white flex items-center justify-center" />
       </div>
     </div>
   );
@@ -1679,7 +1779,6 @@ function PasoResumen({
   proteinas,
   opcionesDesayuno,
   nombre,
-  detalles,
   diaEntrega,
   sede,
   tipoEntrega,
@@ -1700,7 +1799,6 @@ function PasoResumen({
   proteinas: OpcionMenu[];
   opcionesDesayuno: OpcionMenu[];
   nombre: string;
-  detalles: string;
   diaEntrega: DiaEntrega | "";
   sede: SedeRetiro | null;
   tipoEntrega: TipoEntrega;
@@ -1719,623 +1817,237 @@ function PasoResumen({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-display text-2xl font-semibold text-on-surface">
+        <h2 className="font-display text-[30px] font-extrabold text-[#17330A] mt-4 leading-tight">
           Your order summary
         </h2>
-        <p className="text-on-surface-variant font-sans text-sm mt-1">
+        <p className="sub">
           Review everything before sending it via WhatsApp. Tap any card to
           edit it.
         </p>
       </div>
+
+      {/* Setup summary */}
+      <button
+        type="button"
+        onClick={() => onEditarPaso(0)}
+        className="w-full text-left p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white text-on-surface hover:border-[#2F6E00]/60 transition-colors flex items-center gap-12"
+      >
+        <div className="flex-1">
+          <div className="flex justify-between items-center">
+            <span className="text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] uppercase">
+              ORDER SETUP · EDIT
+            </span>
+            <span className="font-bold text-[17px]">{formatearMoneda(subtotal)}</span>
+          </div>
+          <div className="mt-2 text-sm text-[#17330A]">
+            {comidas.length} meal{comidas.length > 1 ? "s" : ""} ·{" "}
+            {modo === "macro" ? "Macro" : "By Portion"}
+          </div>
+        </div>
+      </button>
 
       <div className="space-y-3">
         {comidas.map((c, i) => {
           const proteina = proteinas.find((p) => p.id === c.proteinaId);
           const platoItem = platos?.find((p) => p.id === c.proteinaId);
           const precio = precioComida(c, modo, proteinas, opcionesDesayuno, extrasConfig, platos, carbohidratosFull, vegetalesFull);
+          const tipoLabel =
+            c.tipo === "desayuno"
+              ? "Breakfast"
+              : c.tipo === "plato"
+                ? "Plato"
+                : "Regular Meal";
           return (
             <button
               key={i}
               type="button"
-              onClick={() => onEditarPaso(i + 2)}
-              className="w-full text-left bg-surface-container-lowest border border-outline-variant rounded-xl p-4 hover:border-primary transition-colors"
+              onClick={() => onEditarPaso(i + 1)}
+              className="w-full text-left p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white flex flex-col gap-2 transition-colors hover:border-[#2F6E00]/60"
             >
-              <div className="flex justify-between items-start gap-2">
-                <p className="font-sans text-xs font-bold text-secondary uppercase mb-1 flex items-center gap-1.5">
-                  Meal {i + 1} · {c.tipo === "desayuno" ? "Breakfast" : c.tipo === "plato" ? "Plato" : "Regular"}
-                  <Pencil size={11} className="opacity-60" />
-                </p>
-                <p className="font-sans text-sm font-semibold text-primary shrink-0">
-                  {formatearMoneda(precio)}
-                </p>
+              <div className="flex justify-between items-start">
+                <span className="text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] uppercase">
+                  MEAL {i + 1} · {tipoLabel} · EDIT
+                </span>
+                <span className="font-bold text-[17px]">{formatearMoneda(precio)}</span>
               </div>
-              <p className="font-sans text-sm text-on-surface">
+              <div className="mt-1 text-sm leading-relaxed text-[#17330A]">
                 {c.tipo === "desayuno"
                   ? c.carbohidrato
                   : c.tipo === "plato"
-                  ? platoItem?.nombre ?? ""
-                  : `${proteina?.nombre} + ${c.carbohidrato}${c.vegetal ? ` + ${c.vegetal}` : ""}`}
-                {c.extraActivo && c.extras && c.extras.length > 0 ? ` + ${c.extras.join(", ")}` : ""}
+                    ? platoItem?.nombre ?? ""
+                    : `${proteina?.nombre} + ${c.carbohidrato}${
+                        c.vegetal ? ` + ${c.vegetal}` : ""
+                      }`}
+                {c.extraActivo && c.extras && c.extras.length > 0
+                  ? ` + ${c.extras.join(", ")}`
+                  : ""}
                 {modo === "macro" && c.tipo !== "desayuno"
                   ? ` (${c.gramosProteina}g / ${c.gramosCarbohidrato}g)`
                   : ""}
-              </p>
+              </div>
               {c.comentario && (
-                <p className="font-sans text-xs text-on-surface-variant italic mt-1">
+                <div className="mt-1 text-[11px] text-on-surface-variant italic">
                   Note: {c.comentario}
-                </p>
+                </div>
               )}
             </button>
           );
         })}
       </div>
 
-      <div className="bg-primary/10 rounded-xl px-4 py-3 space-y-1">
-        {descuentoPct > 0 ? (
-          <>
-            <div className="flex justify-between items-center">
-              <span className="font-sans text-xs text-on-surface-variant">
-                Subtotal
-              </span>
-              <span className="font-sans text-xs text-on-surface-variant">
-                {formatearMoneda(subtotal)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-sans text-xs text-secondary font-semibold">
-                Discount ({descuentoPct}% off)
-              </span>
-              <span className="font-sans text-xs text-secondary font-semibold">
-                -{formatearMoneda((subtotal * descuentoPct) / 100)}
-              </span>
-            </div>
-          </>
-        ) : null}
-        <div className="flex justify-between items-center">
-          <span className="font-sans text-sm font-semibold text-primary">
-            Total
-          </span>
-          <span className="font-display text-xl font-semibold text-primary">
-            {formatearMoneda(total)}
-          </span>
-        </div>
+      <div
+        className="flex justify-between items-center p-[16px] rounded-[16px] bg-[#EAF4DC] border border-[#CFCBA8]/40"
+      >
+        <span className="font-medium text-[#17330A]">Total</span>
+        <span className="font-display font-extrabold text-[24px] text-[#2F6E00]">
+          {formatearMoneda(total)}
+        </span>
       </div>
 
       <button
         type="button"
         onClick={onCambiarCodigo}
-        className="w-full text-center font-sans text-xs text-secondary font-semibold hover:underline"
+        className="text-center text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] underline min-h-[44px] flex items-center justify-center"
       >
         {descuentoPct > 0 ? "Change discount code" : "Have a discount code?"}
       </button>
 
-      <button
-        type="button"
-        onClick={() => onEditarPaso(comidas.length + 2)}
-        className="w-full text-left bg-surface-container-lowest border border-outline-variant rounded-xl p-4 hover:border-primary transition-colors"
-      >
-        <p className="font-sans text-xs font-bold text-secondary uppercase mb-1 flex items-center gap-1.5">
-          {tipoEntrega === "delivery" ? "Delivery" : "Pickup"}
-          <Pencil size={11} className="opacity-60" />
-        </p>
-        <p className="font-sans text-sm text-on-surface">{nombre}</p>
-        {tipoEntrega === "delivery" ? (
-          direccionEntrega && (
-            <p className="font-sans text-sm text-on-surface-variant">
-              {direccionEntrega}
-            </p>
-          )
-        ) : (
-          sede && (
-            <p className="font-sans text-sm text-on-surface-variant">
-              {sede.direccion}
-            </p>
-          )
-        )}
-        {detalles && (
-          <p className="font-sans text-sm text-on-surface-variant italic">
-            {detalles}
-          </p>
-        )}
-        <p className="font-sans text-sm text-on-surface-variant">
+      <div className="opt w-full p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white">
+        <div className="text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] uppercase">
+          {tipoEntrega === "delivery" ? "DELIVERY" : "PICKUP"} · EDIT
+        </div>
+        <div className="mt-[8px] text-sm leading-relaxed text-[#17330A] whitespace-pre-line">
+          {nombre}
+          <br />
+          {tipoEntrega === "delivery" ? (
+            direccionEntrega && (
+              <>
+                <br />
+                {direccionEntrega}
+              </>
+            )
+          ) : (
+            sede && (
+              <>
+                <br />
+                {sede.direccion}
+              </>
+            )
+          )}
+          <br />
           {diaEntrega &&
-            etiquetaFecha(proximaFecha(diaEntrega === "domingo" ? 0 : 1, forzarProximaSemana))}
-        </p>
-      </button>
-    </div>
-  );
-}
-
-function IconoInstagram({ size = 20 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
-      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
-    </svg>
-  );
-}
-
-const CARRUSEL_PLATOS = [
-  { nombre: "Mexican Bowl", src: "/carrusel/mexican-bowl.jpeg" },
-  { nombre: "Grilled Fish, Rice & Green Beans", src: "/carrusel/pescado-arroz-vainitas.jpeg" },
-  { nombre: "Steak, Sweet Potato & Asparagus", src: "/carrusel/res-batata-esparragos.jpeg" },
-  { nombre: "Ground Beef, Pasta & Green Beans", src: "/carrusel/carne-molida-pasta-vainitas.jpeg" },
-  { nombre: "Steak, Rice & Asparagus", src: "/carrusel/res-arroz-esparragos.jpeg" },
-  { nombre: "Tuna Ceviche with Quinoa", src: "/carrusel/atun-quinoa-picodegallo.jpeg" },
-  { nombre: "Stuffed Plantain with Cheese & Broccoli", src: "/carrusel/canoa-queso-brocoli.jpeg" },
-  { nombre: "Chicken Wrap", src: "/carrusel/wrap-pollo-vegetales.jpeg" },
-  { nombre: "Shrimp Alfredo Pasta with Asparagus", src: "/carrusel/camarones-pasta-esparragos.jpeg" },
-  { nombre: "Salmon, Quinoa & Salad", src: "/carrusel/salmon-quinoa-ensalada.jpeg" },
-];
-
-const PLATOS_DUPLICADOS = [...CARRUSEL_PLATOS, ...CARRUSEL_PLATOS];
-
-function CarruselComidas() {
-  const trackRef = useRef<HTMLDivElement>(null);
-  const offsetRef = useRef(0);
-  const draggingRef = useRef(false);
-  const startXRef = useRef(0);
-  const startOffsetRef = useRef(0);
-  const distanciaRef = useRef(0);
-  const pausadoHastaRef = useRef(0);
-  const [seleccionado, setSeleccionado] = useState<number | null>(null);
-
-  function normalizar(offset: number, mitad: number) {
-    if (mitad <= 0) return offset;
-    let o = offset % mitad;
-    if (o > 0) o -= mitad;
-    return o;
-  }
-
-  useEffect(() => {
-    let raf: number;
-    function tick() {
-      const el = trackRef.current;
-      const now = performance.now();
-      if (
-        el &&
-        !draggingRef.current &&
-        seleccionado === null &&
-        now > pausadoHastaRef.current
-      ) {
-        const mitad = el.scrollWidth / 2;
-        offsetRef.current = normalizar(offsetRef.current - 0.7, mitad);
-        el.style.transform = `translateX(${offsetRef.current}px)`;
-      }
-      raf = requestAnimationFrame(tick);
-    }
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [seleccionado]);
-
-  function onPointerDown(e: React.PointerEvent<HTMLDivElement>) {
-    draggingRef.current = true;
-    distanciaRef.current = 0;
-    startXRef.current = e.clientX;
-    startOffsetRef.current = offsetRef.current;
-    e.currentTarget.setPointerCapture(e.pointerId);
-  }
-
-  function onPointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!draggingRef.current) return;
-    const el = trackRef.current;
-    if (!el) return;
-    const dx = e.clientX - startXRef.current;
-    distanciaRef.current = Math.abs(dx);
-    const mitad = el.scrollWidth / 2;
-    offsetRef.current = normalizar(startOffsetRef.current + dx, mitad);
-    el.style.transform = `translateX(${offsetRef.current}px)`;
-  }
-
-  function onPointerUp(e: React.PointerEvent<HTMLDivElement>) {
-    draggingRef.current = false;
-    pausadoHastaRef.current = performance.now() + 800;
-    if (distanciaRef.current < 6) {
-      const target = (e.target as HTMLElement).closest("[data-idx]");
-      const idx = target ? Number(target.getAttribute("data-idx")) : null;
-      setSeleccionado((actual) => (actual === idx ? null : idx));
-    }
-  }
-
-  return (
-    <div
-      className="overflow-hidden -mx-6"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-      style={{ touchAction: "pan-y" }}
-    >
-      <div
-        ref={trackRef}
-        className="flex gap-6 w-max px-6 cursor-grab active:cursor-grabbing select-none"
-        style={{ willChange: "transform" }}
-      >
-        {PLATOS_DUPLICADOS.map((plato, i) => {
-          const activo = seleccionado === i;
-          return (
-            <div
-              key={i}
-              data-idx={i}
-              className="group flex flex-col items-center shrink-0 w-48 md:w-64"
-            >
-              <div
-                className={`relative w-48 h-48 md:w-64 md:h-64 rounded-full overflow-hidden shadow-md transition-transform duration-300 ease-out ${
-                  activo
-                    ? "scale-110 -translate-y-2"
-                    : "group-hover:scale-110 group-hover:-translate-y-2"
-                }`}
-              >
-                <Image
-                  src={plato.src}
-                  alt={plato.nombre}
-                  fill
-                  draggable={false}
-                  sizes="(min-width: 768px) 256px, 192px"
-                  className="object-cover pointer-events-none"
-                />
-                <div
-                  className={`absolute inset-0 transition-colors flex items-center justify-center ${
-                    activo ? "bg-black/40" : "bg-black/0 group-hover:bg-black/40"
-                  }`}
-                >
-                  <span
-                    className={`font-sans text-xs font-semibold text-white text-center px-3 transition-opacity ${
-                      activo ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                    }`}
-                  >
-                    {plato.nombre}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+            etiquetaFecha(
+              proximaFecha(diaEntrega === "domingo" ? 0 : 1, forzarProximaSemana),
+            )}
+        </div>
       </div>
     </div>
   );
 }
 
-const CICLO_TINTE = [
-  "bg-primary-fixed text-on-primary-fixed-variant",
-  "bg-secondary-fixed text-on-secondary-fixed-variant",
-  "bg-tertiary-fixed text-on-tertiary-fixed-variant",
-];
-
-const CICLO_SOLIDO = [
-  "bg-primary text-on-primary",
-  "bg-secondary text-on-secondary",
-  "bg-tertiary text-on-tertiary",
-];
-
-const BADGES_CONFIANZA = [
-  "Freshly prepared each week",
-  "Fully customizable",
-  "Never frozen",
-  "Pickup or delivery",
-];
-
-const PASOS_COMO_FUNCIONA = [
-  {
-    titulo: "Pick your meals",
-    descripcion:
-      "Build your order: choose how many meals you want and customize protein, carb, and veggie in each one.",
-  },
-  {
-    titulo: "Add extras if you want",
-    descripcion: "Add an extra protein, carb, or veggie to any meal.",
-  },
-  {
-    titulo: "Choose pickup or delivery",
-    descripcion:
-      "Pick a pickup spot or enter your delivery address, for Sunday or Monday. Orders are open Tuesday through Friday 6pm for that week.",
-  },
-  {
-    titulo: "Confirm on WhatsApp & you're set",
-    descripcion:
-      "We send your confirmation instantly. Grab it at your pickup spot, or we'll bring it to you.",
-  },
-];
-
-const RAZONES_ELEGIRNOS = [
-  {
-    icono: Leaf,
-    titulo: "Always Fresh, Never Frozen",
-    descripcion: "Every meal is cooked fresh for pickup — no freezers, no shortcuts.",
-  },
-  {
-    icono: ChefHat,
-    titulo: "New Menu Weekly",
-    descripcion: "Proteins, carbs, and veggies rotate regularly, so it never gets boring.",
-  },
-  {
-    icono: Store,
-    titulo: "Pickup or Delivery, Your Choice",
-    descripcion: "Swing by your nearest pickup spot, or have it delivered straight to your door.",
-  },
-  {
-    icono: Settings2,
-    titulo: "Fully Customizable",
-    descripcion: "Build every meal your way, with optional extras priced individually.",
-  },
-];
-
-const TESTIMONIOS = [
-  {
-    nombre: "Valeria Rojas",
-    usuario: "@valeriarojasfit",
-    texto: "Que delicia. Las comidas de esta semana estaaann 🔥🔥🔥",
-  },
-  {
-    nombre: "Carlos López",
-    usuario: null,
-    texto:
-      "Demasiado ricas las comidas! A mí y a mi esposa nos hace la vida más fácil 🙏",
-  },
-  {
-    nombre: "Lina G.",
-    usuario: null,
-    texto:
-      "Thanks for everything, I love how healthy and delicious I can eat for my lunches 👍",
-  },
-];
-
-function IntroScreen({
-  onComenzar,
-  opcionesDesayuno = [],
+function PasoConfirmacion({
+  comidas,
+  modo,
+  nombre,
+  telefono,
+  detalles,
+  diaEntrega,
+  sede,
+  tipoEntrega,
+  direccionEntrega,
+  total,
+  whatsappUrl,
+  onStartNewOrder,
 }: {
-  onComenzar: () => void;
-  opcionesDesayuno?: OpcionMenu[];
+  comidas: ComidaSlot[];
+  modo: ModoPedido;
+  nombre: string;
+  telefono: string;
+  detalles: string;
+  diaEntrega: DiaEntrega | "";
+  sede: SedeRetiro | null;
+  tipoEntrega: TipoEntrega;
+  direccionEntrega: string;
+  total: number;
+  whatsappUrl: string;
+  onStartNewOrder: () => void;
 }) {
-  const nombresDesayuno = opcionesDesayuno.length
-    ? opcionesDesayuno.map((o) => o.nombre)
-    : ["Waffles", "Waffles + Eggs", "Waffles + Blackberry", "Waffles + Egg & Turkey Bacon"];
+  const fecha = diaEntrega
+    ? etiquetaFecha(proximaFecha(diaEntrega === "domingo" ? 0 : 1, false))
+    : "";
+  const modoTexto = tipoEntrega === "delivery" ? "Delivery" : "Pickup";
+  const direccionMostrar =
+    tipoEntrega === "delivery" ? direccionEntrega : sede?.direccion ?? "";
+
+  const textoOrden = [
+    "JJ Meals - Nueva orden",
+    `${comidas.length} meals · ${formatearMoneda(total)}`,
+    `${modoTexto} · ${fecha}`,
+    direccionMostrar,
+    nombre ? `Nombre: ${nombre}` : "",
+    telefono ? `Tel: ${telefono}` : "",
+    detalles ? `Detalles: ${detalles}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   return (
-    <main className="min-h-screen bg-surface flex flex-col">
-      {/* Hero + carousel */}
-      <section className="bg-gradient-to-b from-primary-fixed/40 via-surface to-surface px-6 pt-14 pb-10 text-center">
-        <div className="w-20 h-20 mx-auto rounded-2xl bg-white flex items-center justify-center mb-5 overflow-hidden shadow-sm">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="JJ Healthy Food" className="w-16 h-16 object-contain" />
+    <div className="space-y-6 pt-[40px] text-center">
+      <div
+        className="w-[84px] h-[84px] rounded-full bg-[#2F6E00] text-[#fff] text-[44px] flex items-center justify-center mx-auto"
+      >
+        ✓
+      </div>
+      <h2 className="font-display text-[30px] font-extrabold text-[#17330A] mt-4 leading-tight">
+        Your order is ready
+      </h2>
+      <p className="sub mx-auto" style={{ maxWidth: 300 }}>
+        Tap the button to send it via WhatsApp. We confirm it there.
+      </p>
+      <div
+        className="opt w-full p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white mx-auto"
+        style={{ maxWidth: 340 }}
+      >
+        <div className="flex justify-between items-start">
+          <span className="font-bold">{comidas.length} meals</span>
+          <span className="font-extrabold">{formatearMoneda(total)}</span>
         </div>
-
-        <p className="text-secondary font-sans text-sm font-bold uppercase tracking-widest mb-3">
-          JJ Healthy Food
-        </p>
-        <h1 className="font-display text-3xl md:text-4xl font-semibold text-on-surface text-balance mb-4 max-w-2xl mx-auto">
-          Build your healthy meal week in minutes
-        </h1>
-        <p className="font-sans text-on-surface-variant text-base mb-6 max-w-lg mx-auto">
-          We save you time and effort: pick your meals, then choose pickup or
-          delivery on the day that works for you.
-        </p>
-
-        <div className="flex flex-wrap justify-center gap-2 mb-10">
-          {BADGES_CONFIANZA.map((badge, i) => (
-            <span
-              key={badge}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-sans text-xs font-semibold ${CICLO_TINTE[i % CICLO_TINTE.length]}`}
-            >
-              <CheckCircle2 size={13} />
-              {badge}
-            </span>
-          ))}
+        <div className="mt-[8px] text-sm leading-relaxed text-[#4A5A3C]">
+          {modoTexto} · {fecha}{" "}
+          {direccionMostrar && <br />}
+          {direccionMostrar}
         </div>
-
-        <button
-          type="button"
-          onClick={onComenzar}
-          className="bg-secondary text-on-secondary px-8 py-4 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all mb-12"
-        >
-          Start my order
-        </button>
-
-        <CarruselComidas />
-      </section>
-
-      {/* How it works */}
-      <section className="px-6 py-14 max-w-3xl mx-auto w-full">
-        <h2 className="font-display text-2xl md:text-3xl font-semibold text-on-surface text-center mb-2">
-          How it works
-        </h2>
-        <p className="font-sans text-on-surface-variant text-center mb-8">
-          A simple process to get fresh, healthy meals ready for you.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {PASOS_COMO_FUNCIONA.map((paso, i) => (
-            <div
-              key={paso.titulo}
-              className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5"
-            >
-              <div
-                className={`w-9 h-9 rounded-full flex items-center justify-center font-display font-semibold mb-3 ${CICLO_SOLIDO[i % CICLO_SOLIDO.length]}`}
-              >
-                {i + 1}
-              </div>
-              <h3 className="font-sans font-semibold text-on-surface mb-1">
-                {paso.titulo}
-              </h3>
-              <p className="font-sans text-sm text-on-surface-variant">
-                {paso.descripcion}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Breakfast spotlight */}
-      <section className="bg-secondary-fixed/35 px-6 py-14">
-        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-          <div>
-            <span className="inline-block bg-secondary text-on-secondary font-sans text-xs font-bold uppercase tracking-widest mb-3 px-3 py-1 rounded-full">
-              Breakfast
-            </span>
-            <h2 className="font-display text-2xl md:text-3xl font-semibold text-on-surface mb-3">
-              Start your day right
-            </h2>
-            <p className="font-sans text-on-surface-variant mb-5">
-              Choose from our rotating breakfast menu — classic waffles paired
-              with eggs, fruit, or turkey bacon, made fresh for pickup.
-            </p>
-            <div className="flex flex-wrap gap-2 mb-6">
-              {nombresDesayuno.map((nombre) => (
-                <span
-                  key={nombre}
-                  className="bg-surface-container-lowest border border-outline-variant rounded-full px-3 py-1.5 font-sans text-xs font-medium text-on-surface"
-                >
-                  {nombre}
-                </span>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={onComenzar}
-              className="bg-secondary text-on-secondary px-6 py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
-            >
-              Start my order
-            </button>
-          </div>
-          <div className="relative rounded-3xl overflow-hidden shadow-md aspect-[4/5] max-h-[420px] mx-auto w-full max-w-sm">
-            <Image
-              src="/carrusel/desayuno-waffle-fresas.jpeg"
-              alt="Waffles with strawberries breakfast plate"
-              fill
-              sizes="(min-width: 768px) 384px, 100vw"
-              className="object-cover"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Why choose us */}
-      <section className="px-6 py-14 max-w-5xl mx-auto w-full">
-        <h2 className="font-display text-2xl md:text-3xl font-semibold text-on-surface text-center mb-10">
-          Why choose us
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-          <div>
-            <h3 className="font-display text-3xl font-semibold text-on-surface mb-3">
-              The JJ Difference
-            </h3>
-            <p className="font-sans text-on-surface-variant">
-              At JJ Healthy Food, eating well shouldn&apos;t mean giving up
-              flavor or convenience. Every meal is prepared fresh, portioned
-              to your goals, and ready when you are — no subscriptions, no
-              commitments, just great food on your schedule.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {RAZONES_ELEGIRNOS.map((razon, i) => (
-              <div
-                key={razon.titulo}
-                className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-4"
-              >
-                <div
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${CICLO_TINTE[i % CICLO_TINTE.length]}`}
-                >
-                  <razon.icono size={18} />
-                </div>
-                <h4 className="font-sans font-semibold text-on-surface text-sm mb-1">
-                  {razon.titulo}
-                </h4>
-                <p className="font-sans text-xs text-on-surface-variant">
-                  {razon.descripcion}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="bg-primary-fixed/30 px-6 py-14">
-        <h2 className="font-display text-2xl md:text-3xl font-semibold text-on-surface text-center mb-8">
-          What our customers say
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
-          {TESTIMONIOS.map((t, i) => (
-            <div
-              key={t.nombre}
-              className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center font-sans font-semibold shrink-0 ${CICLO_SOLIDO[i % CICLO_SOLIDO.length]}`}
-                >
-                  {t.nombre[0]}
-                </div>
-                <div>
-                  <p className="font-sans text-sm font-semibold text-on-surface">
-                    {t.nombre}
-                  </p>
-                  {t.usuario && (
-                    <p className="font-sans text-xs text-on-surface-variant">
-                      {t.usuario}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="flex gap-0.5 mb-2">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    size={14}
-                    className="fill-secondary-container text-secondary-container"
-                  />
-                ))}
-              </div>
-              <p className="font-sans text-sm text-on-surface-variant">
-                {t.texto}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="px-6 py-12 text-center">
-        <button
-          type="button"
-          onClick={onComenzar}
-          className="bg-secondary text-on-secondary px-8 py-4 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
-        >
-          Start my order
-        </button>
-      </section>
-
-      {/* Footer */}
-      <footer className="mt-auto bg-primary px-6 py-8">
-        <div className="max-w-lg mx-auto flex flex-col items-center gap-3 text-center">
-          <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="JJ Healthy Food" className="w-9 h-9 object-contain" />
-          </div>
-          <p className="font-display text-white font-semibold">JJ Healthy Food</p>
-          <a
-            href="https://instagram.com/jjhealthyfood13"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-white/80 font-sans text-base hover:text-white transition-colors"
-          >
-            <IconoInstagram size={22} />
-            jjhealthyfood13
-          </a>
-          <p className="font-sans text-white/50 text-xs mt-2">
-            © {new Date().getFullYear()} JJ Healthy Food. All rights reserved.
-          </p>
-        </div>
-      </footer>
-    </main>
+      </div>
+      <button
+        type="button"
+        onClick={() => {
+          if (whatsappUrl) window.location.href = whatsappUrl;
+        }}
+        className="w-full max-w-[240px] mx-auto min-h-[52px] rounded-full bg-[#FDC305] text-[#17330A] font-poppins font-bold text-[17px] flex items-center justify-center active:scale-95 transition-all cursor-pointer"
+      >
+        Open WhatsApp
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          navigator.clipboard.writeText(textoOrden);
+        }}
+        className="w-full max-w-[240px] mx-auto min-h-[52px] rounded-full border-[2px] border-[#2F6E00] text-[#17330A] font-poppins font-bold text-[17px] flex items-center justify-center mt-[12px] active:scale-95 transition-all cursor-pointer"
+      >
+        Didn’t open? Copy order text
+      </button>
+      <button
+        type="button"
+        onClick={onStartNewOrder}
+        className="text-center font-bold text-[#2F6E00] underline min-h-[44px] mx-auto mt-[12px] cursor-pointer active:scale-95 transition-all"
+      >
+        Start a new order
+      </button>
+    </div>
   );
 }
+
+
+
+
+

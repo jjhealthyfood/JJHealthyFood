@@ -35,7 +35,7 @@ export function Topbar({
       <header className="md:hidden flex justify-between items-center w-full px-4 h-16 bg-surface sticky top-0 z-40">
         <Link href="/dashboard" className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="JJ Healthy Food" className="w-10 h-10 object-contain" />
+          <img src="/brand/jj-meals-mark.png" alt="JJ Healthy Food" className="w-10 h-10 object-contain" />
           <h1 className="font-display text-lg font-bold text-primary">
             JJ Healthy Food
           </h1>

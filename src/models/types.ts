@@ -9,7 +9,7 @@ export type Clienta = {
 
 export type DiaEntrega = "domingo" | "lunes";
 export type EstadoPedido = "pendiente" | "en_preparacion" | "entregado";
-export type ModoPedido = "racion" | "macro";
+export type ModoPedido = "racion" | "macro" | "keto";
 export type TipoEntrega = "pickup" | "delivery";
 
 export type Pedido = {
@@ -90,4 +90,5 @@ export type OpcionMenu = {
   excluido_extra: boolean;
   extra_price_override: number | null;
   solo_extra: boolean;
+  es_keto: boolean;
 };
