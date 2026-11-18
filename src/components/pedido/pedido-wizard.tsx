@@ -34,7 +34,7 @@ function esDireccionFloridaValida(direccion: string): boolean {
   return ESTADO_FLORIDA_REGEX.test(texto) && ZIP_FLORIDA_REGEX.test(texto);
 }
 
-type TipoComida = "regular" | "desayuno" | "plato";
+type TipoComida = "regular" | "desayuno" | "plato" | "keto";
 
 type ComidaSlot = {
   tipo: TipoComida;
@@ -1106,9 +1106,9 @@ function PasoComida({
         <p className="font-sans text-xs font-bold text-on-surface-variant uppercase mb-3">
           Meal type
         </p>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Chip
-            label={modo === "macro" ? "Macro meal" : "Regular meal"}
+            label={modo === "macro" ? "Macro meal" : modo === "keto" ? "Keto meal" : "Regular meal"}
             selected={comida.tipo === "regular"}
             onClick={() => onCambiar({ tipo: "regular", proteinaId: "" })}
           />
@@ -1124,10 +1124,40 @@ function PasoComida({
             selected={esDesayuno}
             onClick={() => onCambiar({ tipo: "desayuno", proteinaId: "" })}
           />
+          {(platos ?? []).some((o) => o.es_keto) && (
+            <Chip
+              label="Keto"
+              selected={comida.tipo === "keto"}
+              onClick={() => onCambiar({ tipo: "keto", proteinaId: "" })}
+            />
+          )}
         </div>
       </div>
 
-      {comida.tipo === "plato" ? (
+      {comida.tipo === "keto" ? (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <p className="font-sans text-xs font-bold uppercase tracking-wide text-secondary">
+              Choose your keto dish
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            {(platos ?? []).filter((o) => o.es_keto).map((o) => {
+              const precio = modo === "macro"
+                ? (Number(o.precio_macro_gramo) || 12)
+                : (Number(o.precio_racion) || 9);
+              return (
+                <Chip
+                  key={o.id}
+                  label={`${o.nombre} — $${precio}`}
+                  selected={comida.proteinaId === o.id}
+                  onClick={() => onCambiar({ proteinaId: o.id })}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ) : comida.tipo === "plato" ? (
         <>
           <div>
             <div className="flex items-center gap-2 mb-3">
