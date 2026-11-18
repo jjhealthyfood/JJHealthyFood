@@ -37,6 +37,9 @@ const en = {
     open: "Orders open now · close Friday 6pm",
     closed: "Orders closed · reopen Tuesday",
   },
+  ribbon: {
+    delivery: "Free delivery",
+  },
   hero: {
     badge: "NEW · KETO MENU",
     title: "Build your healthy meal week in minutes",
@@ -95,6 +98,9 @@ const en = {
       standardTitle: "Standard protein · $9",
       premiumTitle: "Premium protein · $12",
       sidesTitle: "Carbs & veggies included",
+      carbsLabel: "Carbs",
+      veggiesLabel: "Veggies",
+      includesNote: "Each meal includes 1 protein, 1 carb and 1 veggie.",
       standardFooter: "Standard protein",
       premiumFooter: "Premium protein",
       included: "Included",
@@ -321,6 +327,9 @@ const es: Dict = {
     open: "Pedidos abiertos · cierra viernes 6pm",
     closed: "Pedidos cerrados · reabren el martes",
   },
+  ribbon: {
+    delivery: "Delivery gratis",
+  },
   hero: {
     badge: "NUEVO · MENÚ KETO",
     title: "Arma tu semana de comidas saludables en minutos",
@@ -379,6 +388,9 @@ const es: Dict = {
       standardTitle: "Proteína estándar · $9",
       premiumTitle: "Proteína premium · $12",
       sidesTitle: "Carbohidratos y vegetales incluidos",
+      carbsLabel: "Carbohidratos",
+      veggiesLabel: "Vegetales",
+      includesNote: "Cada comida incluye 1 proteína, 1 carbohidrato y 1 vegetal.",
       standardFooter: "Proteína estándar",
       premiumFooter: "Proteína premium",
       included: "Incluido",

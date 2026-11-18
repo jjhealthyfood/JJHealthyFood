@@ -4,8 +4,10 @@
 :root {
   --primary: #2f6e00;
   --on-primary: #ffffff;
-  --primary-container: #eaf4dc;
-  --on-primary-container: #17330a;
+  /* Contenedor del admin (avatar "J", nav activo): se deja el verde oliva
+     original para que el texto blanco se siga leyendo igual que antes. */
+  --primary-container: #4a5d23;
+  --on-primary-container: #bed58e;
 
   --secondary: #b26a00;
   --on-secondary: #ffffff;
@@ -123,6 +125,31 @@ body {
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* Franja de marca animada (se detiene con prefers-reduced-motion) */
+@keyframes jj-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.jj-marquee {
+  animation: jj-marquee 28s linear infinite;
+}
+
+.jj-marquee:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jj-marquee {
+    animation: none;
+    transform: none;
+  }
 }
 
 /* Accesibilidad: foco visible en todos los controles */

@@ -4,7 +4,7 @@ import type { PedidoParaComanda } from "@/models/types";
 function Campo({ label, valor }: { label: string; valor: string }) {
   return (
     <div>
-      <p className="text-[8px] font-bold uppercase tracking-wider text-black/50">
+      <p className="text-[8px] font-bold uppercase tracking-wider text-black/55">
         {label}
       </p>
       <p className="text-[11px] font-semibold text-black leading-snug">
@@ -55,6 +55,11 @@ function formatearFechaHora(fechaIso: string) {
   }).format(fecha);
 }
 
+/**
+ * Comanda de cocina.
+ * Estilos pensados para impresión: líneas finas y sin rellenos oscuros,
+ * para gastar la menor tinta posible.
+ */
 export function ComandaTicket({
   pedido,
   showSeparator = true,
@@ -75,33 +80,33 @@ export function ComandaTicket({
   return (
     <div className="print:break-inside-avoid print:[page-break-inside:avoid] print:mb-3">
       <div className="bg-white border-2 border-black rounded-xl overflow-hidden w-full">
-        {/* Encabezado */}
-        <div className="bg-black text-white flex items-center justify-between px-4 py-2.5">
+        {/* Encabezado (sin fondo oscuro: ahorra tinta) */}
+        <div className="flex items-center justify-between gap-3 border-b border-black/50 px-4 py-2.5">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center shrink-0">
-              <UtensilsCrossed size={13} className="text-white" />
+            <div className="w-7 h-7 rounded-full border-2 border-black/50 flex items-center justify-center shrink-0">
+              <UtensilsCrossed size={13} className="text-black" />
             </div>
             <div>
-              <p className="font-display font-bold text-sm leading-none">
+              <p className="font-display font-bold text-sm leading-none text-black">
                 JJ Healthy Food
               </p>
-              <p className="text-[8px] uppercase tracking-[0.15em] text-white/60 mt-1">
+              <p className="text-[8px] uppercase tracking-[0.15em] text-black/55 mt-1">
                 Comanda de pedido
               </p>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-[8px] uppercase tracking-wider text-white/60">
+            <p className="text-[8px] uppercase tracking-wider text-black/55">
               Pedido
             </p>
-            <p className="font-mono text-sm font-bold">
+            <p className="font-mono text-sm font-bold text-black">
               #{pedido.id.slice(0, 5).toUpperCase()}
             </p>
           </div>
         </div>
 
         {pedido.descuento_pct > 0 && (
-          <div className="bg-black/10 border-b-2 border-black px-4 py-1.5">
+          <div className="border-b-2 border-black px-4 py-1.5">
             <p className="text-[10px] font-bold text-black uppercase tracking-wider">
               ⚠ {pedido.descuento_pct}% off applied
               {pedido.codigo_descuento ? ` — code: ${pedido.codigo_descuento}` : ""}
@@ -135,21 +140,21 @@ export function ComandaTicket({
             <Campo label="Pedido el" valor={fechaPedidoStr} />
 
             <div>
-              <p className="text-[8px] font-bold uppercase tracking-wider text-black/50">
+              <p className="text-[8px] font-bold uppercase tracking-wider text-black/55">
                 {pedido.tipo_entrega === "delivery" ? "Delivery" : "Retiro"}
               </p>
-              <span className="inline-block mt-1 bg-black text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+              <span className="inline-block mt-1 border border-black/50 text-black text-[10px] font-bold px-2.5 py-0.5 rounded-full">
                 {diaLabel} {fechaEntregaStr}
               </span>
             </div>
 
             <div className="pt-1 space-y-1">
               <span className="flex items-center gap-1.5 text-[10px] text-black/70">
-                <span className="w-3 h-3 rounded-full border border-black/50 inline-block shrink-0" />
+                <span className="w-3 h-3 rounded-full border border-black/45 inline-block shrink-0" />
                 Empacado
               </span>
               <span className="flex items-center gap-1.5 text-[10px] text-black/70">
-                <span className="w-3 h-3 rounded-full border border-black/50 inline-block shrink-0" />
+                <span className="w-3 h-3 rounded-full border border-black/45 inline-block shrink-0" />
                 Retirado
               </span>
             </div>
@@ -160,7 +165,7 @@ export function ComandaTicket({
             <ul className="divide-y divide-black/10">
               {comidas.map((c, i) => (
                 <li key={c.id} className="flex items-start gap-2.5 py-1.5">
-                  <span className="shrink-0 w-4 h-4 rounded-full bg-black text-white text-[9px] font-bold flex items-center justify-center mt-0.5">
+                  <span className="shrink-0 w-4 h-4 rounded-full border border-black/50 text-black text-[9px] font-bold flex items-center justify-center mt-0.5">
                     {i + 1}
                   </span>
                   <span className="flex-1">
@@ -176,7 +181,7 @@ export function ComandaTicket({
                         ` (${c.gramos_proteina}g / ${c.gramos_carbohidrato}g)`}
                     </span>
                     {c.comentario && (
-                      <span className="block text-[11px] font-bold text-white bg-black px-1.5 py-0.5 rounded mt-0.5 w-fit">
+                      <span className="block text-[11px] font-bold text-black border border-black/60 px-1.5 py-0.5 rounded mt-0.5 w-fit">
                         ⚠ {c.comentario}
                       </span>
                     )}
@@ -192,11 +197,11 @@ export function ComandaTicket({
       {/* Separador de corte */}
       {showSeparator && (
         <div className="flex items-center gap-2 my-1 print:my-0">
-          <div className="flex-1 border-t border-dashed border-black/30" />
-          <span className="text-[8px] uppercase tracking-widest text-black/40 shrink-0">
+          <div className="flex-1 border-t border-dashed border-black/35" />
+          <span className="text-[8px] uppercase tracking-widest text-black/45 shrink-0">
             Recortar aquí
           </span>
-          <div className="flex-1 border-t border-dashed border-black/30" />
+          <div className="flex-1 border-t border-dashed border-black/35" />
         </div>
       )}
     </div>

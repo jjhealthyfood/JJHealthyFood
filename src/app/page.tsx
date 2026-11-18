@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { OrderStatusBar } from "@/components/landing/order-status-bar";
 import { Navbar } from "@/components/landing/navbar";
 import { Hero } from "@/components/landing/hero";
+import { BrandRibbon, DeliveryRibbon } from "@/components/landing/brand-ribbon";
 import { WeeklyMenu } from "@/components/landing/weekly-menu";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { MenuSection } from "@/components/landing/menu-section";
@@ -24,10 +25,14 @@ export default function HomePage() {
       <Navbar />
       <main className="flex-1">
         <Hero />
+        <div className="hidden lg:block">
+          <BrandRibbon />
+        </div>
         <WeeklyMenu />
         <HowItWorks />
         <MenuSection />
         <Difference />
+        <DeliveryRibbon />
         <Reviews />
         <CtaBanner />
       </main>

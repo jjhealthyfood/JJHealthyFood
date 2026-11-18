@@ -10,6 +10,13 @@ type TabKey = "regular" | "plato" | "keto" | "breakfast";
 const FOCUS =
   "focus-visible:outline-[3px] focus-visible:outline-offset-[3px] focus-visible:outline-current";
 
+/**
+ * Chip suave (amarillo mantequilla). Mantiene el amarillo de marca solo para
+ * acciones, tabs activos y badges, así no compite ni cansa la vista.
+ */
+const CHIP =
+  "inline-flex min-h-[44px] items-center rounded-full border border-[#EACB6B] bg-[#FFE59B] px-3.5 text-[13px] font-semibold leading-tight text-[#17330A]";
+
 const STANDARD_PROTEINS = [
   "Ground Beef Stuffed Plantain",
   "Chicken soup 12oz",
@@ -34,6 +41,27 @@ const PREMIUM_PROTEINS = [
   "Fish",
   "Grilled Shrimp",
 ];
+
+/** Carbohidratos disponibles según la tabla opciones_menu. */
+const CARBS = [
+  "No Carb",
+  "Pasta regular",
+  "Half sweet potato",
+  "Sweet Potato Mash",
+  "Mashed Potatoes",
+  "Quinoa",
+  "Malanga",
+  "Protein Pasta",
+  "Batata",
+  "Mangú",
+  "Rice",
+  "Yuca",
+  "Roasted Baby Potatoes",
+  "Roasted Sweet Potatoes",
+];
+
+/** Vegetales incluidos. Avocado y Salad son extras, no van aquí. */
+const VEGGIES = ["Mixto", "No Veggies"];
 
 const platoDishes = [
   {
@@ -133,7 +161,7 @@ export function MenuSection() {
 
         {/* Tab 1: Regular Meal */}
         {activeTab === "regular" && (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="flex flex-col justify-between rounded-[24px] bg-white p-5 text-[#17330A] shadow-sm sm:p-6">
               <div>
                 <span className="mb-3 inline-block rounded-full bg-[#EAF4DC] px-3 py-1 text-xs font-bold text-[#2F6E00]">
@@ -144,10 +172,7 @@ export function MenuSection() {
                 </h3>
                 <ul className="flex flex-wrap gap-2">
                   {STANDARD_PROTEINS.map((protein) => (
-                    <li
-                      key={protein}
-                      className="inline-flex min-h-[44px] items-center rounded-full border border-[#E6E2C8] bg-[#FFFBEA] px-3.5 text-[13px] font-semibold leading-tight text-[#17330A]"
-                    >
+                    <li key={protein} className={CHIP}>
                       {protein}
                     </li>
                   ))}
@@ -173,10 +198,7 @@ export function MenuSection() {
                 </h3>
                 <ul className="flex flex-wrap gap-2">
                   {PREMIUM_PROTEINS.map((protein) => (
-                    <li
-                      key={protein}
-                      className="inline-flex min-h-[44px] items-center rounded-full border border-[#E6E2C8] bg-[#FFFBEA] px-3.5 text-[13px] font-semibold leading-tight text-[#17330A]"
-                    >
+                    <li key={protein} className={CHIP}>
                       {protein}
                     </li>
                   ))}
@@ -192,23 +214,52 @@ export function MenuSection() {
               </div>
             </div>
 
-            <div className="flex flex-col justify-between rounded-[24px] bg-white p-5 text-[#17330A] shadow-sm sm:p-6">
+            <div className="flex flex-col justify-between rounded-[24px] bg-white p-5 text-[#17330A] shadow-sm sm:p-6 md:col-span-2">
               <div>
                 <span className="mb-3 inline-block rounded-full bg-[#FFF1B8] px-3 py-1 text-xs font-bold text-[#5B4A00]">
                   {t.menu.regular.sides}
                 </span>
-                <h3 className="mb-2 font-poppins text-lg font-bold">
+                <h3 className="mb-3 font-poppins text-lg font-bold">
                   {t.menu.regular.sidesTitle}
                 </h3>
-                <p className="font-sans text-sm leading-relaxed text-[#17330A]/80">
-                  Mashed Potatoes, Half sweet potato, Sweet Potato Mash, Pasta regular, Protein Pasta, Quinoa, Malanga, Batata, Mangú, Rice, Yuca, Roasted Baby Potatoes, Roasted Sweet Potatoes, or No Carb. Veggies: Mixto or none. Each meal includes 1 protein, 1 carb and 1 veggie.
+
+                <div className="space-y-3">
+                  <div>
+                    <p className="mb-2 font-sans text-[11px] font-bold uppercase tracking-[0.08em] text-[#4A5A3C]">
+                      {t.menu.regular.carbsLabel}
+                    </p>
+                    <ul className="flex flex-wrap gap-2">
+                      {CARBS.map((carb) => (
+                        <li key={carb} className={CHIP}>
+                          {carb}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="mb-2 font-sans text-[11px] font-bold uppercase tracking-[0.08em] text-[#4A5A3C]">
+                      {t.menu.regular.veggiesLabel}
+                    </p>
+                    <ul className="flex flex-wrap gap-2">
+                      {VEGGIES.map((veggie) => (
+                        <li key={veggie} className={CHIP}>
+                          {veggie}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <p className="mt-4 font-sans text-xs leading-relaxed text-[#17330A]/70">
+                  {t.menu.regular.includesNote}
                 </p>
               </div>
               <div className="mt-5 flex items-center justify-between gap-3 border-t border-neutral-100 pt-4">
                 <span className="text-xs font-semibold text-[#4A5A3C]">
                   {t.menu.regular.sides}
                 </span>
-                <span className="font-poppins text-sm font-extrabold text-[#2F6E00]">
+                <span className="inline-flex items-center rounded-full bg-[#EAF4DC] px-3 py-1 font-poppins text-xs font-extrabold text-[#2F6E00]">
                   {t.menu.regular.included}
                 </span>
               </div>
@@ -249,7 +300,7 @@ export function MenuSection() {
                       onClick={() => {
                         window.location.href = "/pedido";
                       }}
-                      className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-full bg-[#FDC305] px-6 font-poppins font-bold text-[13px] text-[#17330A] shadow-sm hover:bg-[#FFD43B] active:scale-95 transition-all cursor-pointer ${FOCUS}"
+                      className={`mt-4 inline-flex min-h-[44px] items-center justify-center rounded-full bg-[#FDC305] px-6 font-poppins font-bold text-[13px] text-[#17330A] shadow-sm hover:bg-[#FFD43B] active:scale-95 transition-all cursor-pointer ${FOCUS}`}
                     >
                       {t.hero.cta}
                     </button>
@@ -275,7 +326,7 @@ export function MenuSection() {
                 ].map((dish) => (
                   <span
                     key={dish}
-                    className="inline-flex items-center min-h-[44px] px-3.5 rounded-full bg-[#FFFBEA] border border-[#E6E2C8] text-[#17330A] text-xs font-semibold"
+                    className="inline-flex min-h-[44px] items-center rounded-full border border-[#EACB6B] bg-[#FFE59B] px-3.5 text-xs font-semibold text-[#17330A]"
                   >
                     {dish}
                   </span>
@@ -283,8 +334,7 @@ export function MenuSection() {
               </div>
               <p className="font-sans text-xs text-[#17330A]/70 mt-4">
                 {t.menu.plato.note}
-              </p>
-            </div>
+              </p>            </div>
           </div>
         )}
 
@@ -332,7 +382,7 @@ export function MenuSection() {
                           onClick={() => {
                             window.location.href = "/pedido";
                           }}
-                          className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-[#FDC305] px-6 font-poppins font-bold text-[13px] text-[#17330A] shadow-sm hover:bg-[#FFD43B] active:scale-95 transition-all cursor-pointer ${FOCUS}"
+                          className={`inline-flex min-h-[44px] items-center justify-center rounded-full bg-[#FDC305] px-6 font-poppins font-bold text-[13px] text-[#17330A] shadow-sm hover:bg-[#FFD43B] active:scale-95 transition-all cursor-pointer ${FOCUS}`}
                         >
                           {t.hero.cta}
                         </button>
@@ -379,7 +429,7 @@ export function MenuSection() {
                   {breakfastItems.map((item) => (
                     <span
                       key={item}
-                      className="inline-flex items-center min-h-[44px] px-3.5 rounded-full bg-[#FFFBEA] border border-[#E6E2C8] text-[#17330A] text-xs font-semibold"
+                      className="inline-flex min-h-[44px] items-center rounded-full border border-[#EACB6B] bg-[#FFE59B] px-3.5 text-xs font-semibold text-[#17330A]"
                     >
                       {item}
                     </span>
@@ -402,7 +452,7 @@ export function MenuSection() {
         <div className="mt-12 text-center">
           <Link
             href="/pedido"
-            className="inline-flex min-h-[50px] items-center justify-center rounded-full bg-[#FDC305] px-8 font-poppins font-bold text-base text-[#17330A] shadow-sm hover:bg-[#FFD43B] hover:shadow-md active:scale-95 transition-all cursor-pointer ${FOCUS}"
+            className={`inline-flex min-h-[50px] items-center justify-center rounded-full bg-[#FDC305] px-8 font-poppins font-bold text-base text-[#17330A] shadow-sm hover:bg-[#FFD43B] hover:shadow-md active:scale-95 transition-all cursor-pointer ${FOCUS}`}
           >
             {t.menu.cta}
           </Link>

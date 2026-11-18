@@ -160,6 +160,78 @@ export async function actualizarPrecioPedido(
   return data as Pedido;
 }
 
+/**
+ * Día en que arranca la semana para el reporte de ingresos semanales.
+ * 1 = lunes, 0 = domingo. Cambia este valor si la semana del negocio
+ * debe empezar otro día.
+ */
+export const DIA_INICIO_SEMANA = 1;
+
+/** Zona horaria del negocio: los cortes de semana/mes se hacen aquí. */
+const ZONA_NEGOCIO = "America/New_York";
+
+type PartesFecha = {
+  y: number;
+  m: number;
+  d: number;
+  h: number;
+  mi: number;
+  s: number;
+};
+
+function partesEnZona(fecha: Date): PartesFecha {
+  const partes = new Intl.DateTimeFormat("en-US", {
+    timeZone: ZONA_NEGOCIO,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(fecha);
+
+  const valor = (tipo: string) =>
+    Number(partes.find((p) => p.type === tipo)?.value ?? 0);
+
+  return {
+    y: valor("year"),
+    m: valor("month"),
+    d: valor("day"),
+    h: valor("hour"),
+    mi: valor("minute"),
+    s: valor("second"),
+  };
+}
+
+/** Diferencia (en minutos) entre la hora de Florida y UTC para ese instante. */
+function desfaseZonaMinutos(fecha: Date): number {
+  const p = partesEnZona(fecha);
+  const comoUtc = Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi, p.s);
+  return (comoUtc - fecha.getTime()) / 60000;
+}
+
+/** Instante UTC que corresponde a la medianoche de Florida de esa fecha. */
+function medianocheEnZona(y: number, m: number, d: number): Date {
+  const ingenuo = Date.UTC(y, m - 1, d, 0, 0, 0);
+  const desfase = desfaseZonaMinutos(new Date(ingenuo));
+  return new Date(ingenuo - desfase * 60000);
+}
+
+/** Devuelve el inicio (00:00 hora de Florida) de la semana actual. */
+export function inicioDeSemana(ahora = new Date()): Date {
+  const { y, m, d } = partesEnZona(ahora);
+  const calendario = new Date(Date.UTC(y, m - 1, d));
+  const diferencia = (calendario.getUTCDay() - DIA_INICIO_SEMANA + 7) % 7;
+  calendario.setUTCDate(calendario.getUTCDate() - diferencia);
+
+  return medianocheEnZona(
+    calendario.getUTCFullYear(),
+    calendario.getUTCMonth() + 1,
+    calendario.getUTCDate()
+  );
+}
+
 export async function calcularIngresosDelMes(
   supabase: SupabaseClient
 ): Promise<number> {
@@ -172,6 +244,24 @@ export async function calcularIngresosDelMes(
     .select("precio_total")
     .eq("estado", "entregado")
     .gte("entregado_en", inicioMes.toISOString());
+
+  if (error) throw error;
+  return data.reduce((total, p) => total + Number(p.precio_total), 0);
+}
+
+/**
+ * Ingresos de la semana actual. Se calcula desde el inicio de la semana, así
+ * que se "limpia" solo cada semana sin borrar nada: los pedidos siguen
+ * contando en el total mensual porque ese se calcula por su cuenta.
+ */
+export async function calcularIngresosDeLaSemana(
+  supabase: SupabaseClient
+): Promise<number> {
+  const { data, error } = await supabase
+    .from("pedidos")
+    .select("precio_total")
+    .eq("estado", "entregado")
+    .gte("entregado_en", inicioDeSemana().toISOString());
 
   if (error) throw error;
   return data.reduce((total, p) => total + Number(p.precio_total), 0);

@@ -93,7 +93,7 @@ function Seccion({ titulo, filas }: { titulo: string; filas: Fila[] }) {
             key={f.etiqueta}
             className="flex items-center gap-3 px-4 py-2 print:break-inside-avoid print:[page-break-inside:avoid]"
           >
-            <span className="shrink-0 w-7 h-7 rounded-full bg-black text-white text-xs font-bold flex items-center justify-center">
+            <span className="shrink-0 w-7 h-7 rounded-full border border-black/50 text-black text-xs font-bold flex items-center justify-center">
               {f.cantidad}
             </span>
             <span className="text-[12px] text-black font-medium">
@@ -122,7 +122,7 @@ function BloqueModo({
 
   return (
     <div>
-      <div className="bg-black/5 px-4 py-1.5 print:break-inside-avoid print:[page-break-inside:avoid]">
+      <div className="border-y border-black/25 px-4 py-1.5 print:break-inside-avoid print:[page-break-inside:avoid]">
         <p className="text-[10px] font-bold uppercase tracking-widest text-black">
           {titulo}
         </p>
@@ -143,11 +143,11 @@ export function ResumenCocina({ pedidos }: { pedidos: PedidoParaComanda[] }) {
   return (
     <div className="print:break-after-page mb-4 print:mb-0">
       <div className="bg-white border-2 border-black rounded-xl overflow-hidden">
-        <div className="bg-black text-white px-4 py-2.5">
-          <p className="font-display font-bold text-sm leading-none">
+        <div className="border-b border-black/50 px-4 py-2.5">
+          <p className="font-display font-bold text-sm leading-none text-black">
             Resumen de Cocina
           </p>
-          <p className="text-[8px] uppercase tracking-[0.15em] text-white/60 mt-1">
+          <p className="text-[8px] uppercase tracking-[0.15em] text-black/55 mt-1">
             {resumen.totalComidas} comida{resumen.totalComidas === 1 ? "" : "s"} en total ·{" "}
             {pedidos.length} pedido{pedidos.length === 1 ? "" : "s"} pendiente
             {pedidos.length === 1 ? "" : "s"}

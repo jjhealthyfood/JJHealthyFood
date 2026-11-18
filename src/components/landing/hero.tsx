@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Leaf } from "lucide-react";
 import { useLanguage } from "@/lib/i18n";
+import { BrandRibbon } from "./brand-ribbon";
 
 const FOCUS =
   "focus-visible:outline-[3px] focus-visible:outline-offset-[3px] focus-visible:outline-current";
@@ -133,6 +134,11 @@ export function Hero() {
                 {badge}
               </span>
             ))}
+          </div>
+
+          {/* Franja de marca: divide el texto de las fotos en móvil */}
+          <div className="-mx-5 mt-1 sm:-mx-6 lg:hidden">
+            <BrandRibbon />
           </div>
         </div>
 
