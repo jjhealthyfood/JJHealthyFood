@@ -9,7 +9,7 @@ export type Clienta = {
 
 export type DiaEntrega = "domingo" | "lunes";
 export type EstadoPedido = "pendiente" | "en_preparacion" | "entregado";
-export type ModoPedido = "racion" | "macro" | "keto";
+export type ModoPedido = "racion" | "macro";
 export type TipoEntrega = "pickup" | "delivery";
 
 export type Pedido = {

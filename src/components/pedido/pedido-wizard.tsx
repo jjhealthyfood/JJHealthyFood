@@ -140,6 +140,32 @@ function precioComida(
     if (!isNaN(precioBD) && precioBD > 0) return precioBD;
     return 9;
   }
+  if (slot.tipo === "keto") {
+    const proteina = proteinas.find((p) => p.id === slot.proteinaId);
+    if (!proteina) return 0;
+    let base = 0;
+    if (modo === "macro") {
+      const precioBD = Number(proteina.precio_macro_gramo);
+      if (!isNaN(precioBD) && precioBD > 0) base = precioBD;
+      else {
+        const fallback = proteina.nivel ? PRECIOS_MACRO[proteina.nivel] : undefined;
+        base = fallback ?? 0;
+      }
+    } else {
+      const precioBD = Number(proteina.precio_racion);
+      if (!isNaN(precioBD) && precioBD > 0) base = precioBD;
+    }
+
+    let extra = 0;
+    if (slot.extraActivo && slot.extras && slot.extras.length > 0) {
+      extra = slot.extras.reduce(
+        (suma, nombre) => suma + precioExtraDeItem(nombre, proteinas, carbohidratosFull, vegetalesFull, extrasConfig),
+        0
+      );
+    }
+
+    return base + extra;
+  }
   const proteina = proteinas.find((p) => p.id === slot.proteinaId);
   if (!proteina) return 0;
   let base = 0;
@@ -222,6 +248,10 @@ function descripcionCorta(
   if (slot.tipo === "plato") {
     const plato = platos.find((p) => p.id === slot.proteinaId);
     return plato?.nombre ?? "—";
+  }
+  if (slot.tipo === "keto") {
+    const proteina = proteinas.find((p) => p.id === slot.proteinaId);
+    return `${slot.carbohidrato || "—"} + ${proteina?.nombre ?? "—"}`;
   }
   const proteina = proteinas.find((p) => p.id === slot.proteinaId);
   if (!proteina) return "—";
@@ -419,6 +449,7 @@ export function PedidoWizard({
       if (!c) return false;
       if (c.tipo === "desayuno") return Boolean(c.proteinaId);
       if (c.tipo === "plato") return Boolean(c.proteinaId);
+      if (c.tipo === "keto") return Boolean(c.proteinaId && c.carbohidrato);
       return Boolean(c.proteinaId && c.carbohidrato);
     }
     if (esPasoEntrega) {
@@ -1021,28 +1052,6 @@ function PasoSetup({
             <span className="text-[#2F6E00] font-extrabold text-xl ml-3">✓</span>
           )}
         </button>
-
-        <button
-          type="button"
-          onClick={() => onCambiarModo("keto")}
-          className={`w-full text-left p-4 rounded-[16px] transition-all cursor-pointer flex items-center justify-between ${
-            modo === "keto"
-              ? "border-2 border-[#2F6E00] bg-[#EAF4DC]"
-              : "border-[1.5px] border-[#CFCBA8] bg-white hover:border-[#2F6E00]/60"
-          }`}
-        >
-          <div>
-            <div className="font-sans font-bold text-[17px] text-[#17330A]">
-              Keto
-            </div>
-            <div className="text-sm text-[#4A5A3C] mt-1">
-              Low-carb protein and keto-friendly meals.
-            </div>
-          </div>
-          {modo === "keto" && (
-            <span className="text-[#2F6E00] font-extrabold text-xl ml-3">✓</span>
-          )}
-        </button>
       </div>
 
       {/* Note */}
@@ -1081,15 +1090,11 @@ function PasoComida({
   platos?: OpcionMenu[];
 }) {
   const esDesayuno = comida.tipo === "desayuno";
-  const platosFiltrados = modo === "keto"
-    ? (platos ?? []).filter((o) => o.es_keto)
-    : platos;
-  const sencillas = modo === "keto"
-    ? proteinas.filter((p) => p.es_keto && p.nivel === "sencilla")
-    : proteinas.filter((p) => p.nivel === "sencilla");
-  const premium = modo === "keto"
-    ? proteinas.filter((p) => p.es_keto && p.nivel === "premium")
-    : proteinas.filter((p) => p.nivel === "premium");
+  const platosKeto = (platos ?? []).filter((o) => o.es_keto);
+  const ketoSencillas = proteinas.filter((p) => p.es_keto && p.nivel === "sencilla");
+  const ketoPremium = proteinas.filter((p) => p.es_keto && p.nivel === "premium");
+  const sencillas = proteinas.filter((p) => p.nivel === "sencilla");
+  const premium = proteinas.filter((p) => p.nivel === "premium");
 
   return (
     <div className="space-y-8">
@@ -1108,7 +1113,7 @@ function PasoComida({
         </p>
         <div className="flex gap-2 flex-wrap">
           <Chip
-            label={modo === "macro" ? "Macro meal" : modo === "keto" ? "Keto meal" : "Regular meal"}
+            label={modo === "macro" ? "Macro meal" : "Regular meal"}
             selected={comida.tipo === "regular"}
             onClick={() => onCambiar({ tipo: "regular", proteinaId: "" })}
           />
@@ -1124,13 +1129,11 @@ function PasoComida({
             selected={esDesayuno}
             onClick={() => onCambiar({ tipo: "desayuno", proteinaId: "" })}
           />
-          {(platos ?? []).some((o) => o.es_keto) && (
-            <Chip
-              label="Keto"
-              selected={comida.tipo === "keto"}
-              onClick={() => onCambiar({ tipo: "keto", proteinaId: "" })}
-            />
-          )}
+          <Chip
+            label="Keto"
+            selected={comida.tipo === "keto"}
+            onClick={() => onCambiar({ tipo: "keto", proteinaId: "", carbohidrato: "" })}
+          />
         </div>
       </div>
 
@@ -1142,20 +1145,126 @@ function PasoComida({
             </p>
           </div>
           <div className="flex flex-col gap-2">
-            {(platos ?? []).filter((o) => o.es_keto).map((o) => {
-              const precio = modo === "macro"
-                ? (Number(o.precio_macro_gramo) || 12)
-                : (Number(o.precio_racion) || 9);
-              return (
-                <Chip
-                  key={o.id}
-                  label={`${o.nombre} — $${precio}`}
-                  selected={comida.proteinaId === o.id}
-                  onClick={() => onCambiar({ proteinaId: o.id })}
-                />
-              );
-            })}
+            {platosKeto.map((o) => (
+              <Chip
+                key={o.id}
+                label={`${o.nombre} — $${Number(o.precio_racion) || 12}`}
+                selected={comida.carbohidrato === o.nombre}
+                onClick={() => onCambiar({ carbohidrato: o.nombre })}
+              />
+            ))}
           </div>
+          <div className="mt-6 space-y-2">
+            <div className="flex items-center gap-2 mb-2">
+              <p className="font-sans text-xs font-bold uppercase tracking-wide text-[#c2410c]">
+                Protein · Standard
+              </p>
+              <span className="font-sans text-xs font-bold text-[#c2410c]">
+                ${modo === "macro" ? (Number(ketoSencillas[0]?.precio_macro_gramo) || 10) : (Number(ketoSencillas[0]?.precio_racion) || 10)}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {ketoSencillas.map((p) => (
+                <Chip
+                  key={p.id}
+                  label={p.nombre}
+                  selected={comida.proteinaId === p.id}
+                  onClick={() => onCambiar({ proteinaId: p.id })}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-2 mb-2">
+              <p className="font-sans text-xs font-bold uppercase tracking-wide text-green-600">
+                Protein · Premium
+              </p>
+              <span className="font-sans text-xs font-bold text-green-600">
+                ${modo === "macro" ? (Number(ketoPremium[0]?.precio_macro_gramo) || 12) : (Number(ketoPremium[0]?.precio_racion) || 12)}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {ketoPremium.map((p) => (
+                <Chip
+                  key={p.id}
+                  label={p.nombre}
+                  selected={comida.proteinaId === p.id}
+                  onClick={() => onCambiar({ proteinaId: p.id })}
+                />
+              ))}
+            </div>
+          </div>
+          {modo === "macro" && (
+            <div className="mt-6 bg-surface-container-low rounded-2xl p-5 space-y-5">
+              <div className="flex items-center justify-between">
+                <span className="font-sans text-xs font-bold text-on-surface-variant uppercase">
+                  Protein
+                </span>
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onCambiar({
+                        gramosProteina: Math.max(0, comida.gramosProteina - 5),
+                      })
+                    }
+                    className="w-8 h-8 rounded-full border border-outline-variant text-on-surface-variant flex items-center justify-center hover:bg-surface-container-highest active:scale-95 transition-all"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <span className="font-sans text-lg font-semibold text-on-surface w-16 text-center">
+                    {comida.gramosProteina}
+                    <span className="text-xs font-normal text-on-surface-variant ml-0.5">g</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onCambiar({
+                        gramosProteina: comida.gramosProteina + 5,
+                      })
+                    }
+                    className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center hover:opacity-90 active:scale-95 transition-all"
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="h-px bg-outline-variant/50" />
+
+              <div className="flex items-center justify-between">
+                <span className="font-sans text-xs font-bold text-on-surface-variant uppercase">
+                  Carb
+                </span>
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onCambiar({
+                        gramosCarbohidrato: Math.max(0, comida.gramosCarbohidrato - 5),
+                      })
+                    }
+                    className="w-8 h-8 rounded-full border border-outline-variant text-on-surface-variant flex items-center justify-center hover:bg-surface-container-highest active:scale-95 transition-all"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <span className="font-sans text-lg font-semibold text-on-surface w-16 text-center">
+                    {comida.gramosCarbohidrato}
+                    <span className="text-xs font-normal text-on-surface-variant ml-0.5">g</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onCambiar({
+                        gramosCarbohidrato: comida.gramosCarbohidrato + 5,
+                      })
+                    }
+                    className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center hover:opacity-90 active:scale-95 transition-all"
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : comida.tipo === "plato" ? (
         <>
@@ -1166,7 +1275,7 @@ function PasoComida({
               </p>
             </div>
             <div className="flex flex-col gap-2">
-              {platosFiltrados.map((o) => {
+              {platos.map((o) => {
                 const precio = modo === "macro"
                   ? (Number(o.precio_macro_gramo) || 12)
                   : (Number(o.precio_racion) || 9);
@@ -1886,7 +1995,9 @@ function PasoResumen({
               ? "Breakfast"
               : c.tipo === "plato"
                 ? "Plato"
-                : "Regular Meal";
+                : c.tipo === "keto"
+                  ? "Keto"
+                  : "Regular Meal";
           return (
             <button
               key={i}
