@@ -170,15 +170,21 @@ export function ComandaTicket({
                   </span>
                   <span className="flex-1">
                     <span className="block text-[12px] text-black font-medium">
-                      {c.es_desayuno
-                        ? c.proteina
-                        : !c.carbohidrato && !c.vegetal
-                        ? c.proteina
-                        : `${c.proteina} + ${c.carbohidrato}${c.vegetal ? ` + ${c.vegetal}` : ""}`}
+                      {c.es_keto ? "KETO · " : ""}
+                      {c.es_keto
+                        ? `${c.carbohidrato}${c.proteina ? ` + ${c.proteina}` : ""}`
+                        : c.es_desayuno
+                          ? c.proteina
+                          : !c.carbohidrato && !c.vegetal
+                            ? c.proteina
+                            : `${c.proteina} + ${c.carbohidrato}${c.vegetal ? ` + ${c.vegetal}` : ""}`}
                       {c.extra ? ` + ${c.extra}` : ""}
                       {!c.es_desayuno &&
                         c.gramos_proteina !== null &&
-                        ` (${c.gramos_proteina}g / ${c.gramos_carbohidrato}g)`}
+                        (c.gramos_carbohidrato !== null &&
+                        c.gramos_carbohidrato !== undefined
+                          ? ` (${c.gramos_proteina}g / ${c.gramos_carbohidrato}g)`
+                          : ` (${c.gramos_proteina}g)`)}
                     </span>
                     {c.comentario && (
                       <span className="block text-[11px] font-bold text-black border border-black/60 px-1.5 py-0.5 rounded mt-0.5 w-fit">

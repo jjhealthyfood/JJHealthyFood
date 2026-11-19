@@ -14,6 +14,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { Chip } from "./chip";
+import { LanguageToggle, useLanguage, type Dict } from "@/lib/i18n";
 import {
   buscarClientaPorTelefono,
   enviarPedido,
@@ -79,8 +80,8 @@ function proximaFecha(diaSemana: number, forzarProximaSemana = false): Date {
   return resultado;
 }
 
-function etiquetaFecha(fecha: Date) {
-  return new Intl.DateTimeFormat("en-US", {
+function etiquetaFecha(fecha: Date, lang: "en" | "es") {
+  return new Intl.DateTimeFormat(lang === "es" ? "es-US" : "en-US", {
     weekday: "long",
     day: "numeric",
     month: "short",
@@ -110,6 +111,25 @@ const PRECIOS_MACRO: Record<string, number> = {
   sencilla: 12,
   premium: 14,
 };
+
+/**
+ * Cada plato keto trae su propia proteína (va incluida en el precio del
+ * plato). La llave es el nombre del plato normalizado.
+ */
+const KETO_PROTEINAS_POR_PLATO: Record<string, string[]> = {
+  "lasagna berenjena": ["Pavo", "Molida"],
+  "lasana berenjena": ["Pavo", "Molida"],
+  "spaghetti zucchini": ["Pollo", "Carne", "Salmon"],
+  "salmon bowl": ["Salmon"],
+};
+
+function normalizarNombre(texto: string) {
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
 
 function precioComida(
   slot: ComidaSlot,
@@ -141,30 +161,12 @@ function precioComida(
     return 9;
   }
   if (slot.tipo === "keto") {
-    const proteina = proteinas.find((p) => p.id === slot.proteinaId);
-    if (!proteina) return 0;
-    let base = 0;
-    if (modo === "macro") {
-      const precioBD = Number(proteina.precio_macro_gramo);
-      if (!isNaN(precioBD) && precioBD > 0) base = precioBD;
-      else {
-        const fallback = proteina.nivel ? PRECIOS_MACRO[proteina.nivel] : undefined;
-        base = fallback ?? 0;
-      }
-    } else {
-      const precioBD = Number(proteina.precio_racion);
-      if (!isNaN(precioBD) && precioBD > 0) base = precioBD;
-    }
-
-    let extra = 0;
-    if (slot.extraActivo && slot.extras && slot.extras.length > 0) {
-      extra = slot.extras.reduce(
-        (suma, nombre) => suma + precioExtraDeItem(nombre, proteinas, carbohidratosFull, vegetalesFull, extrasConfig),
-        0
-      );
-    }
-
-    return base + extra;
+    // En keto el precio lo define el plato (la proteína va incluida):
+    // Lasagna berenjena $12, Spaghetti zucchini $10, Salmon bowl $10.
+    const plato = platos?.find((p) => p.nombre === slot.carbohidrato);
+    if (!plato) return 0;
+    const precioBD = Number(plato.precio_racion);
+    return !isNaN(precioBD) && precioBD > 0 ? precioBD : 0;
   }
   const proteina = proteinas.find((p) => p.id === slot.proteinaId);
   if (!proteina) return 0;
@@ -225,11 +227,11 @@ function precioExtraDeItem(
   return 0;
 }
 
-function faseTexto(paso: number, cantidad: number) {
-  if (paso === 0) return "Step 1 of 4 · Order setup";
-  if (paso <= cantidad) return `Step 2 of 4 · Meal ${paso} of ${cantidad}`;
-  if (paso === cantidad + 1) return "Step 3 of 4 · Pickup & Delivery";
-  return "Step 4 of 4 · Summary & Checkout";
+function faseTexto(paso: number, cantidad: number, t: Dict) {
+  if (paso === 0) return t.wizard.stepSetup;
+  if (paso <= cantidad) return t.wizard.stepMeal(paso, cantidad);
+  if (paso === cantidad + 1) return t.wizard.stepPickupDelivery;
+  return t.wizard.stepSummaryCheckout;
 }
 
 function porcentajeProgreso(paso: number, cantidad: number) {
@@ -251,7 +253,9 @@ function descripcionCorta(
   }
   if (slot.tipo === "keto") {
     const proteina = proteinas.find((p) => p.id === slot.proteinaId);
-    return `${slot.carbohidrato || "—"} + ${proteina?.nombre ?? "—"}`;
+    const platoKeto = platos.find((p) => p.nombre === slot.carbohidrato);
+    const nombrePlato = (platoKeto?.nombre ?? slot.carbohidrato) || "—";
+    return proteina ? `${nombrePlato} + ${proteina.nombre}` : nombrePlato;
   }
   const proteina = proteinas.find((p) => p.id === slot.proteinaId);
   if (!proteina) return "—";
@@ -270,6 +274,7 @@ function ResumenParcial({
   onEditar: (indice: number) => void;
 }) {
   const [expandido, setExpandido] = useState(false);
+  const { t } = useLanguage();
 
   if (comidas.length === 0) return null;
 
@@ -281,7 +286,7 @@ function ResumenParcial({
         className="w-full flex items-center justify-between px-4 py-3 font-sans text-sm font-semibold text-on-surface"
       >
         <span>
-          Your meals so far ({comidas.length})
+          {t.wizard.mealsSoFar(comidas.length)}
         </span>
         <ChevronDown
           size={16}
@@ -307,7 +312,7 @@ function ResumenParcial({
                 </span>
                 {c.comentario && (
                   <span className="block text-[11px] text-on-surface-variant italic truncate">
-                    Note: {c.comentario}
+                    {t.wizard.note}: {c.comentario}
                   </span>
                 )}
               </span>
@@ -341,6 +346,7 @@ export function PedidoWizard({
   extrasConfig?: ExtrasConfig;
   platos?: OpcionMenu[];
 }) {
+  const { t } = useLanguage();
   const [paso, setPaso] = useState(0);
   const [cantidad, setCantidad] = useState(1);
   const [modo, setModo] = useState<ModoPedido>("racion");
@@ -406,7 +412,7 @@ export function PedidoWizard({
         setDescuentoPct(pct);
         setMostrarModalDescuento(false);
       } else {
-        setErrorCodigo("That code isn't valid.");
+        setErrorCodigo(t.wizard.invalidCode);
       }
     });
   }
@@ -542,10 +548,14 @@ export function PedidoWizard({
           extra: c.extraActivo && c.extras && c.extras.length > 0 ? c.extras.join(", ") : null,
           gramos_proteina:
             modo === "macro" && c.tipo !== "desayuno" ? c.gramosProteina : null,
+          // El plato keto no se mide en gramos de carbohidrato.
           gramos_carbohidrato:
-            modo === "macro" && c.tipo !== "desayuno" ? c.gramosCarbohidrato : null,
+            modo === "macro" && c.tipo !== "desayuno" && c.tipo !== "keto"
+              ? c.gramosCarbohidrato
+              : null,
           precio: precioComida(c, modo, proteinas, opcionesDesayuno, extrasConfig, platos, carbohidratosFull, vegetalesFull),
           es_desayuno: c.tipo === "desayuno",
+          es_keto: c.tipo === "keto",
           comentario: c.comentario.trim() || null,
         };
       }
@@ -599,14 +609,12 @@ export function PedidoWizard({
                 JJ Meals
               </div>
               <div className="text-[11px] font-bold tracking-[0.12em] text-[#4A5A3C] leading-none mt-0.5">
-                BUILD YOUR ORDER
+                {t.wizard.headerTagline}
               </div>
             </div>
           </Link>
 
-          <span className="inline-flex items-center min-h-[36px] px-3 rounded-full bg-white border-[1.5px] border-[#CFCBA8] text-[#17330A] text-xs font-semibold">
-            <b className="text-[#2F6E00]">EN</b>&nbsp;·&nbsp;ES
-          </span>
+          <LanguageToggle />
         </div>
       </header>
 
@@ -614,7 +622,7 @@ export function PedidoWizard({
       {!enviado && (
         <div className="max-w-[480px] w-full mx-auto px-5 pt-5 pb-1">
           <div className="font-sans text-sm font-medium text-[#17330A] mb-2">
-            {faseTexto(paso, cantidad)}
+            {faseTexto(paso, cantidad, t)}
           </div>
           <div className="h-2 rounded-full bg-[#EDE9CF] overflow-hidden">
             <div
@@ -711,7 +719,6 @@ export function PedidoWizard({
         {enviado && (
           <PasoConfirmacion
             comidas={comidasActivas}
-            modo={modo}
             nombre={nombre}
             telefono={telefono}
             detalles={detalles}
@@ -744,7 +751,7 @@ export function PedidoWizard({
         <div className="max-w-[480px] mx-auto flex items-center justify-between gap-3">
           <div className="flex flex-col leading-tight">
             <span className="text-[11px] font-bold tracking-[0.06em] text-[#4A5A3C]">
-              ORDER TOTAL
+              {t.common.orderTotal}
             </span>
             <span className="font-poppins font-extrabold text-xl text-[#17330A]">
               {formatearMoneda(total)}
@@ -759,7 +766,7 @@ export function PedidoWizard({
                 className="min-h-[48px] px-3 text-[#4A5A3C] hover:text-[#17330A] font-medium text-sm flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
               >
                 <ChevronLeft size={18} />
-                Back
+                {t.common.back}
               </button>
             )}
 
@@ -770,7 +777,7 @@ export function PedidoWizard({
                 disabled={!puedeAvanzar()}
                 className="flex-1 max-w-[200px] min-h-[52px] rounded-full bg-[#FDC305] hover:bg-[#FFD43B] text-[#17330A] font-poppins font-bold text-[17px] flex items-center justify-center transition-all active:scale-95 shadow-2xs disabled:bg-[#D9D5B8] disabled:text-[#3F4635] disabled:cursor-not-allowed cursor-pointer"
               >
-                {resumenVisitado ? "Summary" : "Next"}
+                {resumenVisitado ? t.wizard.summaryButton : t.common.next}
               </button>
             ) : (
               <button
@@ -779,7 +786,7 @@ export function PedidoWizard({
                 disabled={enviando || enviado}
                 className="flex-1 max-w-[240px] min-h-[52px] rounded-full bg-[#FDC305] hover:bg-[#FFD43B] text-[#17330A] font-poppins font-bold text-[15px] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-2xs disabled:bg-[#D9D5B8] disabled:text-[#3F4635] disabled:cursor-not-allowed cursor-pointer"
               >
-                Send via WhatsApp
+                {t.wizard.sendWhatsApp}
               </button>
             )}
           </div>
@@ -794,14 +801,14 @@ export function PedidoWizard({
             <div className="flex items-center gap-2 text-on-surface">
               <Clock size={20} className="text-secondary" />
               <h3 className="font-display text-lg font-semibold">
-                Orders closed
+                {t.wizard.closedTitle}
               </h3>
             </div>
             <p className="font-sans text-sm text-on-surface-variant">
-              The order deadline for this week has passed (Friday 6 PM Orlando time).
+              {t.wizard.closedText}
             </p>
             <p className="font-sans text-sm text-on-surface-variant">
-              Would you like to schedule your order for <strong>next week</strong>?
+              {t.wizard.closedQuestion}
             </p>
             <div className="flex gap-3">
               <button
@@ -815,7 +822,7 @@ export function PedidoWizard({
                 }}
                 className="flex-1 bg-primary text-on-primary py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
               >
-                Schedule for next week
+                {t.wizard.scheduleNext}
               </button>
               <button
                 type="button"
@@ -825,7 +832,7 @@ export function PedidoWizard({
                 }}
                 className="flex-1 bg-surface-container-high text-on-surface py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
               >
-                Discard
+                {t.wizard.discard}
               </button>
             </div>
           </div>
@@ -838,13 +845,11 @@ export function PedidoWizard({
             <div className="flex items-center gap-2 text-on-surface">
               <AlertTriangle size={20} className="text-secondary" />
               <h3 className="font-display text-lg font-semibold">
-                Possible duplicate order
+                {t.wizard.duplicateTitle}
               </h3>
             </div>
             <p className="font-sans text-sm text-on-surface-variant">
-              You already have an order with these exact same meals for this
-              day that hasn&apos;t been delivered yet. Did you mean to send
-              it again?
+              {t.wizard.duplicateText}
             </p>
             <div className="flex gap-3">
               <button
@@ -855,14 +860,14 @@ export function PedidoWizard({
                 }}
                 className="flex-1 bg-primary text-on-primary py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
               >
-                Send anyway
+                {t.wizard.sendAnyway}
               </button>
               <button
                 type="button"
                 onClick={() => setMostrarAvisoDuplicado(false)}
                 className="flex-1 bg-surface-container-high text-on-surface py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
               >
-                Cancel
+                {t.common.cancel}
               </button>
             </div>
           </div>
@@ -875,18 +880,14 @@ export function PedidoWizard({
             <div className="flex items-center gap-2 text-on-surface">
               <AlertTriangle size={20} className="text-secondary" />
               <h3 className="font-display text-lg font-semibold">
-                We&apos;re full for this weekend
+                {t.wizard.limitTitle}
               </h3>
             </div>
             <p className="font-sans text-sm text-on-surface-variant">
-              We&apos;ve reached our meal capacity for this delivery weekend.
-              Message us on WhatsApp and we&apos;ll let you know if we can
-              make room for your order.
+              {t.wizard.limitText}
             </p>
             <p className="font-sans text-xs text-on-surface-variant bg-surface-container-high rounded-xl px-3 py-2">
-              Don&apos;t close or reload this page while you wait — your
-              meals are still saved here, so once we confirm you can just
-              tap send again.
+              {t.wizard.limitNote}
             </p>
             <div className="flex gap-3">
               <a
@@ -896,14 +897,14 @@ export function PedidoWizard({
                 onClick={() => setAvisoLimite(null)}
                 className="flex-1 text-center bg-primary text-on-primary py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
               >
-                Message us
+                {t.wizard.messageUs}
               </a>
               <button
                 type="button"
                 onClick={() => setAvisoLimite(null)}
                 className="flex-1 bg-surface-container-high text-on-surface py-3 rounded-2xl font-sans text-sm font-semibold active:scale-95 transition-all"
               >
-                Close
+                {t.common.close}
               </button>
             </div>
           </div>
@@ -915,9 +916,9 @@ export function PedidoWizard({
           <div className="w-full max-w-[390px] rounded-t-[24px] bg-white p-[12px_20px_28px] shadow-xl">
             <div className="w-[44px] h-[5px] rounded-[999px] bg-[#CFCBA8] mx-auto mb-16" />
             <h2 className="font-display text-[22px] font-extrabold text-[#17330A] mb-6 text-center">
-              Discount code
+              {t.wizard.discountTitle}
             </h2>
-            <div className="lbl text-center">ENTER YOUR CODE</div>
+            <div className="lbl text-center">{t.wizard.enterCode}</div>
             <input
               type="text"
               value={codigoDescuento}
@@ -926,7 +927,7 @@ export function PedidoWizard({
                 setErrorCodigo("");
               }}
               onKeyDown={(e) => e.key === "Enter" && aplicarCodigoDescuento()}
-              placeholder="e.g. [CÓDIGO]"
+              placeholder={t.wizard.codePlaceholder}
               className="w-full min-h-[48px] px-0 py-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150] text-center"
             />
             {errorCodigo && (
@@ -940,14 +941,14 @@ export function PedidoWizard({
               disabled={validandoCodigo || !codigoDescuento.trim()}
               className="w-full min-h-[52px] rounded-[999px] bg-[#FDC305] hover:bg-[#FFD43B] text-[#17330A] font-poppins font-bold text-[17px] flex items-center justify-center mt-4 transition-all active:scale-95 disabled:bg-[#D9D5B8] disabled:text-[#3F4635] disabled:cursor-not-allowed cursor-pointer"
             >
-              {validandoCodigo ? "Checking..." : "Apply code"}
+              {validandoCodigo ? t.wizard.checking : t.wizard.applyCode}
             </button>
             <button
               type="button"
               onClick={() => setMostrarModalDescuento(false)}
               className="w-full text-center mt-[12px] min-h-[44px] font-medium text-[#17330A] flex items-center justify-center cursor-pointer"
             >
-              Cancel
+              {t.common.cancel}
             </button>
           </div>
         </div>
@@ -967,22 +968,23 @@ function PasoSetup({
   onCambiarCantidad: (n: number) => void;
   onCambiarModo: (m: ModoPedido) => void;
 }) {
+  const { t } = useLanguage();
   return (
     <div className="pb-8 animate-in fade-in duration-200">
       <h2 className="font-poppins text-[30px] font-extrabold text-[#17330A] mt-4 sm:mt-6 tracking-tight leading-tight">
-        Build your order
+        {t.wizard.buildOrder}
       </h2>
 
       {/* Meals count */}
       <div className="text-xs font-bold tracking-[0.08em] text-[#4A5A3C] uppercase mt-7 mb-2">
-        HOW MANY MEALS DO YOU WANT?
+        {t.wizard.howMany}
       </div>
       <div className="flex items-center justify-center gap-8 my-3">
         <button
           type="button"
           onClick={() => onCambiarCantidad(cantidad - 1)}
           disabled={cantidad <= 1}
-          aria-label="Decrease meals"
+          aria-label={t.wizard.decreaseMeals}
           className="w-14 h-14 rounded-full border-[1.5px] border-[#CFCBA8] bg-white flex items-center justify-center text-[28px] text-[#17330A] disabled:opacity-30 hover:bg-neutral-50 active:scale-95 transition-all cursor-pointer disabled:cursor-not-allowed shadow-2xs select-none"
         >
           −
@@ -993,7 +995,7 @@ function PasoSetup({
         <button
           type="button"
           onClick={() => onCambiarCantidad(cantidad + 1)}
-          aria-label="Increase meals"
+          aria-label={t.wizard.increaseMeals}
           className="w-14 h-14 rounded-full bg-[#2F6E00] text-white flex items-center justify-center text-[28px] hover:bg-[#255700] active:scale-95 transition-all cursor-pointer shadow-xs select-none"
         >
           +
@@ -1002,10 +1004,10 @@ function PasoSetup({
 
       {/* How do you want your meals */}
       <div className="text-xs font-bold tracking-[0.08em] text-[#4A5A3C] uppercase mt-7 mb-1">
-        HOW DO YOU WANT YOUR MEALS?
+        {t.wizard.howWant}
       </div>
       <p className="font-sans text-sm text-[#17330A]/80 m-0 mb-3 leading-relaxed">
-        This applies to every meal in this order.
+        {t.wizard.appliesAll}
       </p>
 
       <div className="space-y-2.5">
@@ -1020,10 +1022,10 @@ function PasoSetup({
         >
           <div>
             <div className="font-sans font-bold text-[17px] text-[#17330A]">
-              By Portion
+              {t.wizard.byPortion}
             </div>
             <div className="text-sm text-[#4A5A3C] mt-1">
-              Standard portion of protein, carb, and veggie.
+              {t.wizard.byPortionDesc}
             </div>
           </div>
           {modo === "racion" && (
@@ -1042,10 +1044,10 @@ function PasoSetup({
         >
           <div>
             <div className="font-sans font-bold text-[17px] text-[#17330A]">
-              Macro
+              {t.wizard.macro}
             </div>
             <div className="text-sm text-[#4A5A3C] mt-1">
-              Adjustable protein amount for your macros.
+              {t.wizard.macroDesc}
             </div>
           </div>
           {modo === "macro" && (
@@ -1056,7 +1058,7 @@ function PasoSetup({
 
       {/* Note */}
       <div className="mt-5 p-4 rounded-[16px] bg-[#EAF4DC] text-[#17330A] text-[15px] font-medium leading-relaxed border border-[#CFCBA8]/40">
-        Orders open Tuesday through Friday 6pm for that week.
+        {t.wizard.ordersOpen}
       </div>
     </div>
   );
@@ -1089,50 +1091,105 @@ function PasoComida({
   extrasConfig?: ExtrasConfig;
   platos?: OpcionMenu[];
 }) {
+  const { t } = useLanguage();
   const esDesayuno = comida.tipo === "desayuno";
   const platosKeto = (platos ?? []).filter((o) => o.es_keto);
-  const ketoSencillas = proteinas.filter((p) => p.es_keto && p.nivel === "sencilla");
-  const ketoPremium = proteinas.filter((p) => p.es_keto && p.nivel === "premium");
-  const sencillas = proteinas.filter((p) => p.nivel === "sencilla");
-  const premium = proteinas.filter((p) => p.nivel === "premium");
+  const platosNormales = (platos ?? []).filter((o) => !o.es_keto);
+  // Las proteínas keto no se ofrecen en las comidas regulares/macro.
+  const sencillas = proteinas.filter((p) => !p.es_keto && p.nivel === "sencilla");
+  const premium = proteinas.filter((p) => !p.es_keto && p.nivel === "premium");
+
+  // El plato keto define qué proteínas lo acompañan (van incluidas).
+  const platoKetoElegido = platosKeto.find(
+    (o) => o.nombre === comida.carbohidrato
+  );
+  const permitidasKeto = platoKetoElegido
+    ? KETO_PROTEINAS_POR_PLATO[normalizarNombre(platoKetoElegido.nombre)]
+    : undefined;
+  const proteinasKeto = platoKetoElegido
+    ? proteinas.filter(
+        (p) =>
+          p.es_keto &&
+          (!permitidasKeto ||
+            permitidasKeto.some(
+              (n) => normalizarNombre(n) === normalizarNombre(p.nombre)
+            ))
+      )
+    : [];
 
   return (
     <div className="space-y-8">
       <div>
         <h2 className="font-display text-2xl font-semibold text-on-surface">
-          Meal {numero}
+          {t.wizard.mealN(numero)}
         </h2>
         <p className="text-on-surface-variant font-sans text-sm mt-1">
-          Choose the meal type, then build your ingredients.
+          {t.wizard.chooseType}
         </p>
       </div>
 
       <div>
         <p className="font-sans text-xs font-bold text-on-surface-variant uppercase mb-3">
-          Meal type
+          {t.wizard.mealType}
         </p>
         <div className="flex gap-2 flex-wrap">
           <Chip
-            label={modo === "macro" ? "Macro meal" : "Regular meal"}
+            label={modo === "macro" ? t.wizard.macroMeal : t.wizard.regularMeal}
             selected={comida.tipo === "regular"}
-            onClick={() => onCambiar({ tipo: "regular", proteinaId: "" })}
+            onClick={() =>
+              onCambiar({
+                tipo: "regular",
+                proteinaId: "",
+                carbohidrato: "",
+                vegetal: "",
+                extraActivo: false,
+                extras: [],
+              })
+            }
           />
-          {platos.length > 0 && (
+          {platosNormales.length > 0 && (
             <Chip
-              label="Plato"
+              label={t.wizard.plato}
               selected={comida.tipo === "plato"}
-              onClick={() => onCambiar({ tipo: "plato", proteinaId: "" })}
+              onClick={() =>
+                onCambiar({
+                  tipo: "plato",
+                  proteinaId: "",
+                  carbohidrato: "",
+                  vegetal: "",
+                  extraActivo: false,
+                  extras: [],
+                })
+              }
             />
           )}
           <Chip
-            label="Breakfast"
+            label={t.wizard.breakfast}
             selected={esDesayuno}
-            onClick={() => onCambiar({ tipo: "desayuno", proteinaId: "" })}
+            onClick={() =>
+              onCambiar({
+                tipo: "desayuno",
+                proteinaId: "",
+                carbohidrato: "",
+                vegetal: "",
+                extraActivo: false,
+                extras: [],
+              })
+            }
           />
           <Chip
-            label="Keto"
+            label={t.wizard.keto}
             selected={comida.tipo === "keto"}
-            onClick={() => onCambiar({ tipo: "keto", proteinaId: "", carbohidrato: "" })}
+            onClick={() =>
+              onCambiar({
+                tipo: "keto",
+                proteinaId: "",
+                carbohidrato: "",
+                vegetal: "",
+                extraActivo: false,
+                extras: [],
+              })
+            }
           />
         </div>
       </div>
@@ -1141,7 +1198,7 @@ function PasoComida({
         <div>
           <div className="flex items-center gap-2 mb-3">
             <p className="font-sans text-xs font-bold uppercase tracking-wide text-secondary">
-              Choose your keto dish
+              {t.wizard.chooseKeto}
             </p>
           </div>
           <div className="flex flex-col gap-2">
@@ -1150,53 +1207,56 @@ function PasoComida({
                 key={o.id}
                 label={`${o.nombre} — $${Number(o.precio_racion) || 12}`}
                 selected={comida.carbohidrato === o.nombre}
-                onClick={() => onCambiar({ carbohidrato: o.nombre })}
+                onClick={() =>
+                  onCambiar({
+                    carbohidrato: o.nombre,
+                    proteinaId: "",
+                    vegetal: "",
+                    extraActivo: false,
+                    extras: [],
+                  })
+                }
               />
             ))}
           </div>
-          <div className="mt-6 space-y-2">
-            <div className="flex items-center gap-2 mb-2">
-              <p className="font-sans text-xs font-bold uppercase tracking-wide text-[#c2410c]">
-                Protein · Standard
+          <div className="mt-6 space-y-3">
+            {!platoKetoElegido ? (
+              <p className="font-sans text-sm text-on-surface-variant">
+                {t.wizard.ketoPickDishFirst}
               </p>
-              <span className="font-sans text-xs font-bold text-[#c2410c]">
-                ${modo === "macro" ? (Number(ketoSencillas[0]?.precio_macro_gramo) || 10) : (Number(ketoSencillas[0]?.precio_racion) || 10)}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {ketoSencillas.map((p) => (
-                <Chip
-                  key={p.id}
-                  label={p.nombre}
-                  selected={comida.proteinaId === p.id}
-                  onClick={() => onCambiar({ proteinaId: p.id })}
-                />
-              ))}
-            </div>
-            <div className="flex items-center gap-2 mb-2">
-              <p className="font-sans text-xs font-bold uppercase tracking-wide text-green-600">
-                Protein · Premium
-              </p>
-              <span className="font-sans text-xs font-bold text-green-600">
-                ${modo === "macro" ? (Number(ketoPremium[0]?.precio_macro_gramo) || 12) : (Number(ketoPremium[0]?.precio_racion) || 12)}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {ketoPremium.map((p) => (
-                <Chip
-                  key={p.id}
-                  label={p.nombre}
-                  selected={comida.proteinaId === p.id}
-                  onClick={() => onCambiar({ proteinaId: p.id })}
-                />
-              ))}
-            </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <p className="font-sans text-xs font-bold uppercase tracking-wide text-[#c2410c]">
+                    {t.wizard.protein}
+                  </p>
+                  <span className="font-sans text-[11px] font-semibold uppercase tracking-wide bg-[#FDC305]/25 text-[#17330A] px-2 py-0.5 rounded-full">
+                    {t.wizard.ketoIncluded}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {proteinasKeto.map((p) => (
+                    <Chip
+                      key={p.id}
+                      label={p.nombre}
+                      selected={comida.proteinaId === p.id}
+                      onClick={() => onCambiar({ proteinaId: p.id })}
+                    />
+                  ))}
+                </div>
+                <p className="font-sans text-xs text-on-surface-variant">
+                  {t.wizard.ketoPriceNote(
+                    formatearMoneda(Number(platoKetoElegido.precio_racion) || 0)
+                  )}
+                </p>
+              </>
+            )}
           </div>
           {modo === "macro" && (
             <div className="mt-6 bg-surface-container-low rounded-2xl p-5 space-y-5">
               <div className="flex items-center justify-between">
                 <span className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-                  Protein
+                  {t.wizard.protein}
                 </span>
                 <div className="flex items-center gap-4">
                   <button
@@ -1228,41 +1288,50 @@ function PasoComida({
                 </div>
               </div>
 
-              <div className="h-px bg-outline-variant/50" />
+              {comida.tipo !== "keto" && (
+                <>
+                  <div className="h-px bg-outline-variant/50" />
 
-              <div className="flex items-center justify-between">
-                <span className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-                  Carb
-                </span>
-                <div className="flex items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onCambiar({
-                        gramosCarbohidrato: Math.max(0, comida.gramosCarbohidrato - 5),
-                      })
-                    }
-                    className="w-8 h-8 rounded-full border border-outline-variant text-on-surface-variant flex items-center justify-center hover:bg-surface-container-highest active:scale-95 transition-all"
-                  >
-                    <Minus size={14} />
-                  </button>
-                  <span className="font-sans text-lg font-semibold text-on-surface w-16 text-center">
-                    {comida.gramosCarbohidrato}
-                    <span className="text-xs font-normal text-on-surface-variant ml-0.5">g</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onCambiar({
-                        gramosCarbohidrato: comida.gramosCarbohidrato + 5,
-                      })
-                    }
-                    className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center hover:opacity-90 active:scale-95 transition-all"
-                  >
-                    <Plus size={14} />
-                  </button>
-                </div>
-              </div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-sans text-xs font-bold text-on-surface-variant uppercase">
+                      {t.wizard.carbLabel}
+                    </span>
+                    <div className="flex items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onCambiar({
+                            gramosCarbohidrato: Math.max(
+                              0,
+                              comida.gramosCarbohidrato - 5
+                            ),
+                          })
+                        }
+                        className="w-8 h-8 rounded-full border border-outline-variant text-on-surface-variant flex items-center justify-center hover:bg-surface-container-highest active:scale-95 transition-all"
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <span className="font-sans text-lg font-semibold text-on-surface w-16 text-center">
+                        {comida.gramosCarbohidrato}
+                        <span className="text-xs font-normal text-on-surface-variant ml-0.5">
+                          g
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onCambiar({
+                            gramosCarbohidrato: comida.gramosCarbohidrato + 5,
+                          })
+                        }
+                        className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center hover:opacity-90 active:scale-95 transition-all"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -1271,11 +1340,11 @@ function PasoComida({
           <div>
             <div className="flex items-center gap-2 mb-3">
               <p className="font-sans text-xs font-bold uppercase tracking-wide text-secondary">
-                Choose your dish
+                {t.wizard.chooseDish}
               </p>
             </div>
             <div className="flex flex-col gap-2">
-              {platos.map((o) => {
+              {platosNormales.map((o) => {
                 const precio = modo === "macro"
                   ? (Number(o.precio_macro_gramo) || 12)
                   : (Number(o.precio_racion) || 9);
@@ -1295,7 +1364,7 @@ function PasoComida({
             <div className="bg-surface-container-low rounded-2xl p-5 space-y-5">
               <div className="flex items-center justify-between">
                 <span className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-                  Protein
+                  {t.wizard.protein}
                 </span>
                 <div className="flex items-center gap-4">
                   <button
@@ -1331,7 +1400,7 @@ function PasoComida({
 
               <div className="flex items-center justify-between">
                 <span className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-                  Carb
+                  {t.wizard.carbLabel}
                 </span>
                 <div className="flex items-center gap-4">
                   <button
@@ -1378,7 +1447,7 @@ function PasoComida({
         <div>
           <div className="flex items-center gap-2 mb-3">
             <p className="font-sans text-xs font-bold uppercase tracking-wide text-secondary">
-              Choose your breakfast
+              {t.wizard.chooseBreakfast}
             </p>
           </div>
           <div className="flex flex-col gap-2">
@@ -1397,7 +1466,7 @@ function PasoComida({
           <div>
             <div className="flex items-center gap-2 mb-2">
               <p className="font-sans text-xs font-bold uppercase tracking-wide text-[#c2410c]">
-                Protein · Standard
+                {t.wizard.proteinStandard}
               </p>
               <span className="font-sans text-xs font-bold text-[#c2410c]">
                 ${modo === "macro" ? (Number(sencillas[0]?.precio_macro_gramo) || PRECIOS_MACRO.sencilla) : (Number(sencillas[0]?.precio_racion) || 0)}
@@ -1415,7 +1484,7 @@ function PasoComida({
             </div>
             <div className="flex items-center gap-2 mb-2">
               <p className="font-sans text-xs font-bold uppercase tracking-wide text-green-600">
-                Protein · Premium
+                {t.wizard.proteinPremium}
               </p>
               <span className="font-sans text-xs font-bold text-green-600">
                 ${modo === "macro" ? (Number(premium[0]?.precio_macro_gramo) || PRECIOS_MACRO.premium) : (Number(premium[0]?.precio_racion) || 0)}
@@ -1435,7 +1504,7 @@ function PasoComida({
 
           <div>
             <p className="font-sans text-xs font-bold uppercase tracking-wide text-[#b45309] mb-3">
-              Carb
+              {t.wizard.carbLabel}
             </p>
             <div className="flex flex-wrap gap-2">
               {carbohidratos.map((c) => (
@@ -1451,7 +1520,7 @@ function PasoComida({
 
           <div>
             <p className="font-sans text-xs font-bold uppercase tracking-wide text-[#15803d] mb-3">
-              Veggie (optional)
+              {t.wizard.veggieOptional}
             </p>
             <div className="flex flex-wrap gap-2">
               {vegetales.map((v) => (
@@ -1470,7 +1539,7 @@ function PasoComida({
           <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-primary/10 text-primary">
             <Leaf size={18} className="shrink-0" />
             <p className="font-sans text-sm">
-              Includes 1 protein, 1 carb, and 1 veggie.
+              {t.wizard.includesNote}
             </p>
           </div>
 
@@ -1478,7 +1547,7 @@ function PasoComida({
             <div className="bg-surface-container-low rounded-2xl p-5 space-y-5">
               <div className="flex items-center justify-between">
                 <span className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-                  Protein
+                  {t.wizard.protein}
                 </span>
                 <div className="flex items-center gap-4">
                   <button
@@ -1514,7 +1583,7 @@ function PasoComida({
 
               <div className="flex items-center justify-between">
                 <span className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-                  Carb
+                  {t.wizard.carbLabel}
                 </span>
                 <div className="flex items-center gap-4">
                   <button
@@ -1561,12 +1630,12 @@ function PasoComida({
 
       <div className="space-y-2">
         <label className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-          Notes for this meal (optional)
+          {t.wizard.notes}
         </label>
         <textarea
           value={comida.comentario}
           onChange={(e) => onCambiar({ comentario: e.target.value })}
-          placeholder="e.g., no onions, sauce on the side..."
+          placeholder={t.wizard.notesPlaceholder}
           rows={2}
           className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant rounded-xl font-sans text-sm focus:ring-2 focus:ring-primary outline-none resize-none"
         />
@@ -1590,6 +1659,7 @@ function ExtraToggle({
   vegetalesFull: OpcionMenu[];
   extrasConfig?: ExtrasConfig;
 }) {
+  const { t } = useLanguage();
   const extrasActuales = comida.extras ?? [];
 
   function toggleExtra(nombre: string) {
@@ -1604,7 +1674,7 @@ function ExtraToggle({
     <div>
       <label className="flex items-center justify-between cursor-pointer mb-3">
         <span className="font-sans text-xs font-bold text-on-surface-variant uppercase">
-          Add something extra?
+          {t.wizard.addExtra}
         </span>
         <input
           type="checkbox"
@@ -1619,7 +1689,7 @@ function ExtraToggle({
         <div className="space-y-3">
           <div>
             <p className="text-[11px] uppercase mb-1.5 text-[#c2410c] font-bold tracking-wide">
-              Another protein
+              {t.wizard.anotherProtein}
             </p>
             <div className="flex flex-wrap gap-2">
               {proteinas.filter((p) => !p.excluido_extra).map((p) => {
@@ -1637,7 +1707,7 @@ function ExtraToggle({
           </div>
           <div>
             <p className="text-[11px] uppercase mb-1.5 text-green-600 font-bold tracking-wide">
-              Another carb
+              {t.wizard.anotherCarb}
             </p>
             <div className="flex flex-wrap gap-2">
               {carbohidratosFull.filter((c) => !c.excluido_extra).map((c) => {
@@ -1655,12 +1725,12 @@ function ExtraToggle({
           </div>
           <div>
             <p className="text-[11px] uppercase mb-1.5 text-teal-600 font-bold tracking-wide">
-              Another veggie
+              {t.wizard.anotherVeggie}
             </p>
             <div className="flex flex-wrap gap-2">
               {vegetalesFull.filter((v) => !v.excluido_extra).map((v) => {
                 const precio = v.extra_price_override ?? (extrasConfig?.vegetal ?? 0);
-                const texto = precio === 0 ? `${v.nombre} (free)` : `${v.nombre} (+ $${precio})`;
+                const texto = precio === 0 ? `${v.nombre} (${t.common.free})` : `${v.nombre} (+ $${precio})`;
                 return (
                   <Chip
                     key={v.id}
@@ -1717,26 +1787,33 @@ function PasoEntrega({
   onTipoEntregaChange: (v: TipoEntrega) => void;
   onDireccionEntregaChange: (v: string) => void;
 }) {
+  const { t, lang } = useLanguage();
   const telefonoInvalido =
     telefono.trim().length > 0 && !TELEFONO_US_REGEX.test(telefono.trim());
   const sedeElegida = sedes.find((s) => s.id === sedeId) ?? null;
-  const lblTitulo = tipoEntrega === "delivery" ? "DELIVERY ADDRESS" : "PICKUP LOCATION";
-  const lblDia = tipoEntrega === "delivery" ? "DELIVERY DAY" : "PICKUP DAY";
+  const lblTitulo =
+    tipoEntrega === "delivery" ? t.wizard.deliveryAddress : t.wizard.pickupLocation;
+  const lblDia =
+    tipoEntrega === "delivery" ? t.wizard.deliveryDay : t.wizard.pickupDay;
 
   return (
     <div className="space-y-6">
       <div>
         <h2 className="font-display text-[30px] font-extrabold text-[#17330A] mt-4 leading-tight">
-          {tipoEntrega === "delivery" ? "Delivery details" : "Pickup details"}
+          {tipoEntrega === "delivery"
+            ? t.wizard.deliveryDetails
+            : t.wizard.pickupDetails}
         </h2>
         <p className="sub">
-          We need these to coordinate your {tipoEntrega === "delivery" ? "delivery" : "pickup"}.
+          {tipoEntrega === "delivery"
+            ? t.wizard.needDelivery
+            : t.wizard.needPickup}
         </p>
       </div>
 
       {bienvenidaClienta && (
         <p className="text-sm font-sans text-primary bg-primary/10 rounded-xl px-4 py-3">
-          Welcome back, {bienvenidaClienta}! We&apos;ve filled in your info.
+          {t.wizard.welcomeBack(bienvenidaClienta)}
         </p>
       )}
 
@@ -1750,7 +1827,7 @@ function PasoEntrega({
               : "bg-transparent text-[#17330A]"
           }`}
         >
-          Pickup
+          {t.wizard.pickup}
         </button>
         <button
           type="button"
@@ -1761,12 +1838,12 @@ function PasoEntrega({
               : "bg-transparent text-[#17330A] font-medium"
           }`}
         >
-          Delivery
+          {t.wizard.delivery}
         </button>
       </div>
 
       <div className="mt-4 rounded-[16px] bg-[#EAF4DC] p-[14px_16px] text-[15px]">
-        Orders open Tuesday through Friday 6pm for that week.
+        {t.wizard.ordersOpen}
       </div>
 
       <div className="lbl">{
@@ -1782,7 +1859,7 @@ function PasoEntrega({
               type="text"
               value={direccionEntrega}
               onChange={(e) => onDireccionEntregaChange(e.target.value)}
-              placeholder="Street address"
+              placeholder={t.wizard.street}
               className="w-full h-full px-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150]"
             />
           </div>
@@ -1791,12 +1868,12 @@ function PasoEntrega({
           >
             <input
               type="text"
-              placeholder="Apt / unit (optional)"
+              placeholder={t.wizard.apt}
               className="w-full h-full px-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150]"
             />
           </div>
           <div className="note mt-4 p-[14px_16px] bg-[#EAF4DC] text-[15px]">
-            [TARIFA O ZONA DE ENTREGA]
+            {t.wizard.deliveryZoneNote}
           </div>
         </div>
       ) : sedes.length > 1 ? (
@@ -1832,7 +1909,18 @@ function PasoEntrega({
         )
       )}
 
-      <div className="lbl mt-[20px]">PHONE</div>
+      <div className="lbl mt-[20px]">{t.wizard.name}</div>
+      <div className="in">
+        <input
+          type="text"
+          value={nombre}
+          onChange={(e) => onNombreChange(e.target.value)}
+          placeholder={t.wizard.namePlaceholder}
+          className="w-full h-full px-0 py-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150]"
+        />
+      </div>
+
+      <div className="lbl mt-[20px]">{t.wizard.phone}</div>
       <div className="in relative">
         <input
           type="tel"
@@ -1840,34 +1928,28 @@ function PasoEntrega({
           onChange={(e) => onTelefonoChange(e.target.value)}
           onBlur={onTelefonoBlur}
           placeholder="(555) 123-4567"
+          autoComplete="off"
           className="w-full h-full px-0 py-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150]"
         />
         {telefonoInvalido && (
           <p className="text-xs text-error font-sans mt-2">
-            Please enter a valid US phone number.
+            {t.wizard.invalidPhone}
           </p>
         )}
       </div>
 
-      <div className="lbl mt-[20px]">NAME</div>
-      <div className="in">
-        <input
-          type="text"
-          value={nombre}
-          onChange={(e) => onNombreChange(e.target.value)}
-          placeholder="Your full name"
-          className="w-full h-full px-0 py-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150]"
-        />
-      </div>
-
-      <div className="lbl mt-[20px]">ADDITIONAL DETAILS (OPTIONAL)</div>
+      <div className="lbl mt-[20px]">{t.wizard.additional}</div>
       <div
         className="in min-h-[72px] mt-[8px] align-[flex-start] pt-[12px] relative"
       >
         <textarea
           value={detalles}
           onChange={(e) => onDetallesChange(e.target.value)}
-          placeholder={`Anything we should know about your ${tipoEntrega === "delivery" ? "delivery" : "pickup"}?`}
+          placeholder={
+            tipoEntrega === "delivery"
+              ? t.wizard.additionalDelivery
+              : t.wizard.additionalPickup
+          }
           rows={2}
           className="w-full h-full px-0 py-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none resize-none placeholder:text-[#5B6150]"
         />
@@ -1876,12 +1958,12 @@ function PasoEntrega({
       <div className="lbl mt-[20px]">{lblDia}</div>
       {forzarProximaSemana && (
         <p className="text-[12px] font-bold text-secondary bg-secondary/10 rounded-lg px-3 py-[1.5px] mt-[8px]">
-          Scheduling for next week
+          {t.wizard.schedulingNextWeek}
         </p>
       )}
       <div className="row mt-[8px] flex gap-8 flex-wrap">
         <Chip
-          label={etiquetaFecha(proximaFecha(0, forzarProximaSemana))}
+          label={etiquetaFecha(proximaFecha(0, forzarProximaSemana), lang)}
           selected={diaEntrega === "domingo"}
           onClick={() => onDiaChange("domingo")}
           classNameOverride={`${
@@ -1891,7 +1973,7 @@ function PasoEntrega({
           }`}
         />
         <Chip
-          label={etiquetaFecha(proximaFecha(1, forzarProximaSemana))}
+          label={etiquetaFecha(proximaFecha(1, forzarProximaSemana), lang)}
           selected={diaEntrega === "lunes"}
           onClick={() => onDiaChange("lunes")}
           classNameOverride={`${
@@ -1904,7 +1986,7 @@ function PasoEntrega({
 
       <div className="chk mt-[24px] flex items-center justify-between">
         <span className="font-bold text-[13px] tracking-[0.06em] text-[#17330A]">
-          REMEMBER MY DETAILS FOR NEXT TIME
+          {t.wizard.rememberDetails}
         </span>
         <div className="box w-[28px] h-[28px] rounded-[8px] border-[2px] border-[#17330A] bg-white flex items-center justify-center" />
       </div>
@@ -1953,16 +2035,14 @@ function PasoResumen({
   vegetalesFull?: OpcionMenu[];
   forzarProximaSemana?: boolean;
 }) {
+  const { t, lang } = useLanguage();
   return (
     <div className="space-y-6">
       <div>
         <h2 className="font-display text-[30px] font-extrabold text-[#17330A] mt-4 leading-tight">
-          Your order summary
+          {t.wizard.summaryTitle}
         </h2>
-        <p className="sub">
-          Review everything before sending it via WhatsApp. Tap any card to
-          edit it.
-        </p>
+        <p className="sub">{t.wizard.summaryText}</p>
       </div>
 
       {/* Setup summary */}
@@ -1974,13 +2054,13 @@ function PasoResumen({
         <div className="flex-1">
           <div className="flex justify-between items-center">
             <span className="text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] uppercase">
-              ORDER SETUP · EDIT
+              {t.wizard.orderSetupEdit}
             </span>
             <span className="font-bold text-[17px]">{formatearMoneda(subtotal)}</span>
           </div>
           <div className="mt-2 text-sm text-[#17330A]">
-            {comidas.length} meal{comidas.length > 1 ? "s" : ""} ·{" "}
-            {modo === "macro" ? "Macro" : "By Portion"}
+            {t.wizard.mealsCount(comidas.length)} ·{" "}
+            {modo === "macro" ? t.wizard.macro : t.wizard.byPortion}
           </div>
         </div>
       </button>
@@ -1992,12 +2072,12 @@ function PasoResumen({
           const precio = precioComida(c, modo, proteinas, opcionesDesayuno, extrasConfig, platos, carbohidratosFull, vegetalesFull);
           const tipoLabel =
             c.tipo === "desayuno"
-              ? "Breakfast"
+              ? t.wizard.breakfast
               : c.tipo === "plato"
-                ? "Plato"
+                ? t.wizard.plato
                 : c.tipo === "keto"
-                  ? "Keto"
-                  : "Regular Meal";
+                  ? t.wizard.keto
+                  : t.wizard.regularMeal;
           return (
             <button
               key={i}
@@ -2007,7 +2087,7 @@ function PasoResumen({
             >
               <div className="flex justify-between items-start">
                 <span className="text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] uppercase">
-                  MEAL {i + 1} · {tipoLabel} · EDIT
+                  {t.wizard.mealEdit(i + 1, tipoLabel)}
                 </span>
                 <span className="font-bold text-[17px]">{formatearMoneda(precio)}</span>
               </div>
@@ -2016,19 +2096,23 @@ function PasoResumen({
                   ? c.carbohidrato
                   : c.tipo === "plato"
                     ? platoItem?.nombre ?? ""
-                    : `${proteina?.nombre} + ${c.carbohidrato}${
-                        c.vegetal ? ` + ${c.vegetal}` : ""
-                      }`}
+                    : c.tipo === "keto"
+                      ? `${c.carbohidrato} + ${proteina?.nombre ?? ""}`
+                      : `${proteina?.nombre} + ${c.carbohidrato}${
+                          c.vegetal ? ` + ${c.vegetal}` : ""
+                        }`}
                 {c.extraActivo && c.extras && c.extras.length > 0
                   ? ` + ${c.extras.join(", ")}`
                   : ""}
                 {modo === "macro" && c.tipo !== "desayuno"
-                  ? ` (${c.gramosProteina}g / ${c.gramosCarbohidrato}g)`
+                  ? c.tipo === "keto" || c.gramosCarbohidrato === null
+                    ? ` (${t.wizard.gramsProtein(c.gramosProteina)})`
+                    : ` (${t.wizard.gramsProteinCarb(c.gramosProteina, c.gramosCarbohidrato)})`
                   : ""}
               </div>
               {c.comentario && (
                 <div className="mt-1 text-[11px] text-on-surface-variant italic">
-                  Note: {c.comentario}
+                  {t.wizard.note}: {c.comentario}
                 </div>
               )}
             </button>
@@ -2039,7 +2123,7 @@ function PasoResumen({
       <div
         className="flex justify-between items-center p-[16px] rounded-[16px] bg-[#EAF4DC] border border-[#CFCBA8]/40"
       >
-        <span className="font-medium text-[#17330A]">Total</span>
+        <span className="font-medium text-[#17330A]">{t.wizard.total}</span>
         <span className="font-display font-extrabold text-[24px] text-[#2F6E00]">
           {formatearMoneda(total)}
         </span>
@@ -2050,12 +2134,12 @@ function PasoResumen({
         onClick={onCambiarCodigo}
         className="text-center text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] underline min-h-[44px] flex items-center justify-center"
       >
-        {descuentoPct > 0 ? "Change discount code" : "Have a discount code?"}
+        {descuentoPct > 0 ? t.wizard.changeCode : t.wizard.haveCode}
       </button>
 
       <div className="opt w-full p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white">
         <div className="text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] uppercase">
-          {tipoEntrega === "delivery" ? "DELIVERY" : "PICKUP"} · EDIT
+          {tipoEntrega === "delivery" ? t.wizard.deliveryEdit : t.wizard.pickupEdit}
         </div>
         <div className="mt-[8px] text-sm leading-relaxed text-[#17330A] whitespace-pre-line">
           {nombre}
@@ -2079,6 +2163,7 @@ function PasoResumen({
           {diaEntrega &&
             etiquetaFecha(
               proximaFecha(diaEntrega === "domingo" ? 0 : 1, forzarProximaSemana),
+              lang
             )}
         </div>
       </div>
@@ -2088,7 +2173,6 @@ function PasoResumen({
 
 function PasoConfirmacion({
   comidas,
-  modo,
   nombre,
   telefono,
   detalles,
@@ -2101,7 +2185,6 @@ function PasoConfirmacion({
   onStartNewOrder,
 }: {
   comidas: ComidaSlot[];
-  modo: ModoPedido;
   nombre: string;
   telefono: string;
   detalles: string;
@@ -2113,21 +2196,26 @@ function PasoConfirmacion({
   whatsappUrl: string;
   onStartNewOrder: () => void;
 }) {
+  const { t, lang } = useLanguage();
   const fecha = diaEntrega
-    ? etiquetaFecha(proximaFecha(diaEntrega === "domingo" ? 0 : 1, false))
+    ? etiquetaFecha(
+        proximaFecha(diaEntrega === "domingo" ? 0 : 1, false),
+        lang
+      )
     : "";
-  const modoTexto = tipoEntrega === "delivery" ? "Delivery" : "Pickup";
+  const modoTexto =
+    tipoEntrega === "delivery" ? t.wizard.delivery : t.wizard.pickup;
   const direccionMostrar =
     tipoEntrega === "delivery" ? direccionEntrega : sede?.direccion ?? "";
 
   const textoOrden = [
-    "JJ Meals - Nueva orden",
-    `${comidas.length} meals · ${formatearMoneda(total)}`,
+    t.wizard.orderCopyTitle,
+    `${t.wizard.mealsCount(comidas.length)} · ${formatearMoneda(total)}`,
     `${modoTexto} · ${fecha}`,
     direccionMostrar,
-    nombre ? `Nombre: ${nombre}` : "",
-    telefono ? `Tel: ${telefono}` : "",
-    detalles ? `Detalles: ${detalles}` : "",
+    nombre ? `${t.wizard.copyName}: ${nombre}` : "",
+    telefono ? `${t.wizard.copyPhone}: ${telefono}` : "",
+    detalles ? `${t.wizard.copyDetails}: ${detalles}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -2140,17 +2228,17 @@ function PasoConfirmacion({
         ✓
       </div>
       <h2 className="font-display text-[30px] font-extrabold text-[#17330A] mt-4 leading-tight">
-        Your order is ready
+        {t.wizard.readyTitle}
       </h2>
       <p className="sub mx-auto" style={{ maxWidth: 300 }}>
-        Tap the button to send it via WhatsApp. We confirm it there.
+        {t.wizard.readyText}
       </p>
       <div
         className="opt w-full p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white mx-auto"
         style={{ maxWidth: 340 }}
       >
         <div className="flex justify-between items-start">
-          <span className="font-bold">{comidas.length} meals</span>
+          <span className="font-bold">{t.wizard.mealsCount(comidas.length)}</span>
           <span className="font-extrabold">{formatearMoneda(total)}</span>
         </div>
         <div className="mt-[8px] text-sm leading-relaxed text-[#4A5A3C]">
@@ -2166,7 +2254,7 @@ function PasoConfirmacion({
         }}
         className="w-full max-w-[240px] mx-auto min-h-[52px] rounded-full bg-[#FDC305] text-[#17330A] font-poppins font-bold text-[17px] flex items-center justify-center active:scale-95 transition-all cursor-pointer"
       >
-        Open WhatsApp
+        {t.wizard.openWhatsApp}
       </button>
       <button
         type="button"
@@ -2175,14 +2263,14 @@ function PasoConfirmacion({
         }}
         className="w-full max-w-[240px] mx-auto min-h-[52px] rounded-full border-[2px] border-[#2F6E00] text-[#17330A] font-poppins font-bold text-[17px] flex items-center justify-center mt-[12px] active:scale-95 transition-all cursor-pointer"
       >
-        Didn’t open? Copy order text
+        {t.wizard.copyOrder}
       </button>
       <button
         type="button"
         onClick={onStartNewOrder}
         className="text-center font-bold text-[#2F6E00] underline min-h-[44px] mx-auto mt-[12px] cursor-pointer active:scale-95 transition-all"
       >
-        Start a new order
+        {t.wizard.newOrder}
       </button>
     </div>
   );

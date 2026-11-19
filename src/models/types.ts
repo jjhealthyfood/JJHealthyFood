@@ -51,6 +51,7 @@ export type ComidaPedido = {
   gramos_carbohidrato: number | null;
   precio: number;
   es_desayuno: boolean;
+  es_keto: boolean;
   comentario: string | null;
 };
 

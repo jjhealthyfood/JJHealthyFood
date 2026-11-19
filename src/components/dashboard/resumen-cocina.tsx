@@ -15,6 +15,7 @@ function aFilas(mapa: Map<string, number>): Fila[] {
 function construirResumen(pedidos: PedidoParaComanda[]) {
   const desayunos = new Map<string, number>();
   const platos = new Map<string, number>();
+  const keto = new Map<string, number>();
   const proteinasReg = new Map<string, number>();
   const carbosReg = new Map<string, number>();
   const vegetalesReg = new Map<string, number>();
@@ -32,6 +33,15 @@ function construirResumen(pedidos: PedidoParaComanda[]) {
 
       if (c.es_desayuno) {
         agregar(desayunos, c.proteina);
+        continue;
+      }
+      if (c.es_keto) {
+        // Plato keto: no se descompone en proteina/carb/veg. Se junta el
+        // plato con la proteina que lo acompaña.
+        agregar(
+          keto,
+          c.proteina ? `${c.carbohidrato} + ${c.proteina}` : c.carbohidrato
+        );
         continue;
       }
       if (!c.carbohidrato) {
@@ -65,6 +75,7 @@ function construirResumen(pedidos: PedidoParaComanda[]) {
     totalComidas,
     desayunos: aFilas(desayunos),
     platos: aFilas(platos),
+    keto: aFilas(keto),
     regular: {
       proteinas: aFilas(proteinasReg),
       carbohidratos: aFilas(carbosReg),
@@ -155,6 +166,7 @@ export function ResumenCocina({ pedidos }: { pedidos: PedidoParaComanda[] }) {
         </div>
 
         <Seccion titulo="Desayunos" filas={resumen.desayunos} />
+        <Seccion titulo="Keto" filas={resumen.keto} />
         <Seccion titulo="Platos" filas={resumen.platos} />
         <BloqueModo titulo="Por porción (regular)" grupo={resumen.regular} />
         <BloqueModo titulo="Por gramos (macro)" grupo={resumen.macro} />

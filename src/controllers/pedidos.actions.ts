@@ -64,6 +64,7 @@ type FirmaComida = {
   gramos_proteina: number | string | null;
   gramos_carbohidrato: number | string | null;
   es_desayuno: boolean;
+  es_keto?: boolean;
 };
 
 function firmaComida(c: FirmaComida): string {
@@ -75,7 +76,7 @@ function firmaComida(c: FirmaComida): string {
     c.gramos_carbohidrato === null || c.gramos_carbohidrato === undefined
       ? ""
       : String(Number(c.gramos_carbohidrato));
-  return [c.proteina, c.carbohidrato ?? "", c.vegetal ?? "", c.extra ?? "", gp, gc, c.es_desayuno].join("|");
+  return [c.proteina, c.carbohidrato ?? "", c.vegetal ?? "", c.extra ?? "", gp, gc, c.es_desayuno, Boolean(c.es_keto)].join("|");
 }
 
 // Domingo y el lunes siguiente cuentan como el mismo fin de semana de
@@ -163,6 +164,15 @@ function precioComidaServidor(
     );
     if (!desayuno) return 0;
     const precioBD = Number(desayuno.precio_racion);
+    return !isNaN(precioBD) && precioBD > 0 ? precioBD : 0;
+  }
+
+  // Comida keto: el plato define el precio y la proteína va incluida.
+  const platoKeto = opcionesMenu.find(
+    (o) => o.categoria === "plato" && o.es_keto && o.nombre === c.carbohidrato
+  );
+  if (platoKeto) {
+    const precioBD = Number(platoKeto.precio_racion);
     return !isNaN(precioBD) && precioBD > 0 ? precioBD : 0;
   }
 
@@ -277,7 +287,9 @@ function construirMensajeWhatsapp(
 ) {
   const lineas = comidas
     .map((c) => {
-      const base = c.es_desayuno
+      const base = c.es_keto
+        ? `KETO · ${c.carbohidrato}${c.proteina ? ` + ${c.proteina}` : ""}`
+        : c.es_desayuno
         ? c.proteina
         : !c.carbohidrato && !c.vegetal
         ? c.proteina
@@ -285,7 +297,9 @@ function construirMensajeWhatsapp(
       const extra = c.extra ? ` + extra: ${c.extra}` : "";
       const gramos =
         modo === "macro" && !c.es_desayuno && c.gramos_proteina !== null
-          ? ` (${c.gramos_proteina}g / ${c.gramos_carbohidrato}g)`
+          ? c.gramos_carbohidrato !== null && c.gramos_carbohidrato !== undefined
+            ? ` (${c.gramos_proteina}g / ${c.gramos_carbohidrato}g)`
+            : ` (${c.gramos_proteina}g)`
           : "";
       const nota = c.comentario ? `\n   _Note: ${c.comentario}_` : "";
       return `*Meal ${c.numero_comida}:* ${base}${extra}${gramos} — ${formatearMoneda(c.precio)}${nota}`;

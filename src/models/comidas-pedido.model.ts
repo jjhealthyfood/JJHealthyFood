@@ -10,6 +10,32 @@ export async function crearComidasPedido(
   // INSERT ... RETURNING sin una politica de SELECT para anon).
   const { error } = await supabase.from("comidas_pedido").insert(comidas);
 
+  // Si la migracion de la bandera keto (20261118000000_comidas_keto.sql)
+  // todavia no esta aplicada, Postgres rechaza la columna es_keto. En ese
+  // caso guardamos la comida igual (sin la bandera) en vez de perder el
+  // pedido: la cocina la vera como antes.
+  if (error && /es_keto/i.test(error.message ?? "")) {
+    console.warn(
+      "comidas_pedido.es_keto no existe; guardando sin la bandera keto. Aplica supabase/migrations/20261118000000_comidas_keto.sql"
+    );
+    const comidasSinBandera = comidas.map((c) => {
+      const copia = { ...c } as Partial<typeof c>;
+      delete copia.es_keto;
+      return copia;
+    });
+    const { error: errorSinBandera } = await supabase
+      .from("comidas_pedido")
+      .insert(comidasSinBandera);
+    if (errorSinBandera) {
+      console.error(
+        "Error Supabase al insertar comidas:",
+        JSON.stringify(errorSinBandera, null, 2)
+      );
+      throw errorSinBandera;
+    }
+    return;
+  }
+
   if (error) {
     console.error("Error Supabase al insertar comidas:", JSON.stringify(error, null, 2));
     console.error("Datos que se intentaron insertar:", JSON.stringify(comidas, null, 2));

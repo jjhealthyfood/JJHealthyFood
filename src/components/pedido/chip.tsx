@@ -21,7 +21,7 @@ export function Chip({
           : "bg-white text-on-surface border-outline-variant hover:border-[#2F6E00]/60 font-medium")
       }`}
     >
-      {selected && <span className="text-primary">✓</span>}
+      {selected && <span className="text-on-primary">✓</span>}
       {label}
     </button>
   );
