@@ -1909,27 +1909,40 @@ function PasoEntrega({
         )
       )}
 
-      <div className="lbl mt-[20px]">{t.wizard.name}</div>
-      <div className="in">
+      <div className="space-y-1.5">
+        <label
+          htmlFor="customer-name"
+          className="block text-xs font-bold tracking-wider text-[#3D4A33] uppercase"
+        >
+          {t.wizard.name}
+        </label>
         <input
+          id="customer-name"
           type="text"
           value={nombre}
           onChange={(e) => onNombreChange(e.target.value)}
           placeholder={t.wizard.namePlaceholder}
-          className="w-full h-full px-0 py-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150]"
+          className="w-full rounded-xl bg-white border border-[#CFC7B0] px-3.5 py-3 text-sm text-[#1D2B14] placeholder:text-[#8E9685] focus:outline-none focus:border-[#3B6E12] focus:ring-2 focus:ring-[#3B6E12]/20"
         />
       </div>
 
-      <div className="lbl mt-[20px]">{t.wizard.phone}</div>
-      <div className="in relative">
+      <div className="space-y-1.5">
+        <label
+          htmlFor="customer-phone"
+          className="block text-xs font-bold tracking-wider text-[#3D4A33] uppercase"
+        >
+          {t.wizard.phone}
+        </label>
         <input
+          id="customer-phone"
           type="tel"
+          inputMode="tel"
           value={telefono}
           onChange={(e) => onTelefonoChange(e.target.value)}
           onBlur={onTelefonoBlur}
           placeholder="(555) 123-4567"
           autoComplete="off"
-          className="w-full h-full px-0 py-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150]"
+          className="w-full rounded-xl bg-white border border-[#CFC7B0] px-3.5 py-3 text-sm text-[#1D2B14] placeholder:text-[#8E9685] focus:outline-none focus:border-[#3B6E12] focus:ring-2 focus:ring-[#3B6E12]/20"
         />
         {telefonoInvalido && (
           <p className="text-xs text-error font-sans mt-2">
@@ -1938,11 +1951,16 @@ function PasoEntrega({
         )}
       </div>
 
-      <div className="lbl mt-[20px]">{t.wizard.additional}</div>
-      <div
-        className="in min-h-[72px] mt-[8px] align-[flex-start] pt-[12px] relative"
-      >
+      <div className="space-y-1.5">
+        <label
+          htmlFor="additional-details"
+          className="block text-xs font-bold tracking-wider text-[#3D4A33] uppercase"
+        >
+          {t.wizard.additional}
+        </label>
         <textarea
+          id="additional-details"
+          rows={2}
           value={detalles}
           onChange={(e) => onDetallesChange(e.target.value)}
           placeholder={
@@ -1950,8 +1968,7 @@ function PasoEntrega({
               ? t.wizard.additionalDelivery
               : t.wizard.additionalPickup
           }
-          rows={2}
-          className="w-full h-full px-0 py-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none resize-none placeholder:text-[#5B6150]"
+          className="w-full rounded-xl bg-white border border-[#CFC7B0] px-3.5 py-2.5 text-sm text-[#1D2B14] placeholder:text-[#8E9685] resize-none focus:outline-none focus:border-[#3B6E12] focus:ring-2 focus:ring-[#3B6E12]/20"
         />
       </div>
 
@@ -1985,9 +2002,12 @@ function PasoEntrega({
       </div>
 
       <div className="chk mt-[24px] flex items-center justify-between">
-        <span className="font-bold text-[13px] tracking-[0.06em] text-[#17330A]">
-          {t.wizard.rememberDetails}
-        </span>
+        <div>
+          <span className="font-bold text-[13px] tracking-[0.06em] text-[#17330A]">
+            {t.wizard.rememberDetails}
+          </span>
+          <p className="text-[11px] text-[#5C6B50] mt-0.5">Guardado de forma local en este dispositivo</p>
+        </div>
         <div className="box w-[28px] h-[28px] rounded-[8px] border-[2px] border-[#17330A] bg-white flex items-center justify-center" />
       </div>
     </div>
