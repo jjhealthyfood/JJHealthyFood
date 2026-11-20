@@ -2017,23 +2017,6 @@ function PasoEntrega({
 
       <div className="space-y-1.5">
         <label
-          htmlFor="customer-name"
-          className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]"
-        >
-          {t.wizard.name}
-        </label>
-        <input
-          id="customer-name"
-          type="text"
-          value={nombre}
-          onChange={(e) => onNombreChange(e.target.value)}
-          placeholder={t.wizard.namePlaceholder}
-          className="w-full rounded-xl border border-[#CFC7B0] bg-white px-3.5 py-3 text-base text-[#1D2B14] placeholder:text-[#8E9685] focus:border-[#2F6E00] focus:outline-none focus:ring-2 focus:ring-[#2F6E00]/20"
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <label
           htmlFor="customer-phone"
           className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]"
         >
@@ -2055,6 +2038,23 @@ function PasoEntrega({
             {t.wizard.invalidPhone}
           </p>
         )}
+      </div>
+
+      <div className="space-y-1.5">
+        <label
+          htmlFor="customer-name"
+          className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]"
+        >
+          {t.wizard.name}
+        </label>
+        <input
+          id="customer-name"
+          type="text"
+          value={nombre}
+          onChange={(e) => onNombreChange(e.target.value)}
+          placeholder={t.wizard.namePlaceholder}
+          className="w-full rounded-xl border border-[#CFC7B0] bg-white px-3.5 py-3 text-base text-[#1D2B14] placeholder:text-[#8E9685] focus:border-[#2F6E00] focus:outline-none focus:ring-2 focus:ring-[#2F6E00]/20"
+        />
       </div>
 
       <div className="space-y-1.5">
