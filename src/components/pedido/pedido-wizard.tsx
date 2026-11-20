@@ -12,6 +12,10 @@ import {
   Pencil,
   AlertTriangle,
   ChevronDown,
+  MapPin,
+  Truck,
+  Copy,
+  Trash2,
 } from "lucide-react";
 import { Chip } from "./chip";
 import { LanguageToggle, useLanguage, type Dict } from "@/lib/i18n";
@@ -266,14 +270,26 @@ function ResumenParcial({
   comidas,
   proteinas,
   platos,
+  modo,
+  opcionesDesayuno,
+  extrasConfig,
+  carbohidratosFull = [],
+  vegetalesFull = [],
   onEditar,
+  onDuplicar,
 }: {
   comidas: ComidaSlot[];
   proteinas: OpcionMenu[];
   platos: OpcionMenu[];
+  modo: ModoPedido;
+  opcionesDesayuno: OpcionMenu[];
+  extrasConfig?: ExtrasConfig;
+  carbohidratosFull?: OpcionMenu[];
+  vegetalesFull?: OpcionMenu[];
   onEditar: (indice: number) => void;
+  onDuplicar: (indice: number) => void;
 }) {
-  const [expandido, setExpandido] = useState(false);
+  const [expandido, setExpandido] = useState(true);
   const { t } = useLanguage();
 
   if (comidas.length === 0) return null;
@@ -285,9 +301,7 @@ function ResumenParcial({
         onClick={() => setExpandido((v) => !v)}
         className="w-full flex items-center justify-between px-4 py-3 font-sans text-sm font-semibold text-on-surface"
       >
-        <span>
-          {t.wizard.mealsSoFar(comidas.length)}
-        </span>
+        <span>{t.wizard.mealsSoFar(comidas.length)}</span>
         <ChevronDown
           size={16}
           className={`transition-transform ${expandido ? "rotate-180" : ""}`}
@@ -296,28 +310,57 @@ function ResumenParcial({
       {expandido && (
         <div className="px-2 pb-2 space-y-1">
           {comidas.map((c, i) => (
-            <button
+            <div
               key={i}
-              type="button"
-              onClick={() => onEditar(i)}
-              className="w-full text-left px-2.5 py-2 rounded-xl hover:bg-surface-container-high transition-colors flex items-start gap-2"
+              className="flex items-center gap-2 px-2.5 py-2 rounded-xl hover:bg-surface-container-high transition-colors"
             >
-              <span className="shrink-0 w-5 h-5 rounded-full bg-primary text-on-primary text-[10px] font-bold flex items-center justify-center mt-0.5">
-                {i + 1}
-              </span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-xs text-on-surface truncate">
-                  {descripcionCorta(c, proteinas, platos)}
-                  {c.extraActivo && c.extras && c.extras.length > 0 ? ` + ${c.extras.join(", ")}` : ""}
+              <button
+                type="button"
+                onClick={() => onEditar(i)}
+                className="flex flex-1 items-start gap-2 text-left min-w-0"
+              >
+                <span className="shrink-0 w-5 h-5 rounded-full bg-primary text-on-primary text-[10px] font-bold flex items-center justify-center mt-0.5">
+                  {i + 1}
                 </span>
-                {c.comentario && (
-                  <span className="block text-[11px] text-on-surface-variant italic truncate">
-                    {t.wizard.note}: {c.comentario}
+                <span className="flex-1 min-w-0">
+                  <span className="block text-xs text-on-surface truncate">
+                    {descripcionCorta(c, proteinas, platos)}
+                    {c.extraActivo && c.extras && c.extras.length > 0
+                      ? ` + ${c.extras.join(", ")}`
+                      : ""}
                   </span>
+                  {c.comentario && (
+                    <span className="block text-[11px] text-on-surface-variant italic truncate">
+                      {t.wizard.note}: {c.comentario}
+                    </span>
+                  )}
+                </span>
+                <Pencil size={11} className="opacity-50 shrink-0 mt-1" />
+              </button>
+              <span className="shrink-0 text-xs font-bold text-[#17330A]">
+                {formatearMoneda(
+                  precioComida(
+                    c,
+                    modo,
+                    proteinas,
+                    opcionesDesayuno,
+                    extrasConfig,
+                    platos,
+                    carbohidratosFull,
+                    vegetalesFull
+                  )
                 )}
               </span>
-              <Pencil size={11} className="opacity-50 shrink-0 mt-1" />
-            </button>
+              <button
+                type="button"
+                onClick={() => onDuplicar(i)}
+                aria-label={t.common.duplicate}
+                title={t.common.duplicate}
+                className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[#2F6E00] hover:bg-[#EAF4DC] transition-colors"
+              >
+                <Copy size={13} />
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -444,8 +487,47 @@ export function PedidoWizard({
     const encontrada = await buscarClientaPorTelefono(telefono.trim());
     if (encontrada) {
       setBienvenidaClienta(encontrada.nombre);
-      if (!nombre) setNombre(encontrada.nombre);
+      setNombre((actual) => (actual.trim() ? actual : encontrada.nombre));
     }
+  }
+
+  // Autocompleta el nombre en cuanto el telefono tiene un formato valido,
+  // sin esperar a que la clienta salga del campo.
+  useEffect(() => {
+    const tel = telefono.trim();
+    if (!TELEFONO_US_REGEX.test(tel)) return;
+    const timer = setTimeout(async () => {
+      const encontrada = await buscarClientaPorTelefono(tel);
+      if (!encontrada) return;
+      setBienvenidaClienta(encontrada.nombre);
+      setNombre((actual) => (actual.trim() ? actual : encontrada.nombre));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [telefono]);
+
+  function duplicarComida(indice: number) {
+    setComidas((prev) => {
+      const copia = [...prev];
+      const original = copia[indice];
+      if (!original) return prev;
+      copia.splice(indice + 1, 0, {
+        ...original,
+        extras: original.extras ? [...original.extras] : original.extras,
+      });
+      return copia;
+    });
+    setCantidad((c) => c + 1);
+    // El indice de la comida actual (o del resumen) se corre uno hacia abajo.
+    setPaso((p) => p + 1);
+    setResumenVisitado(false);
+  }
+
+  function eliminarComida(indice: number) {
+    if (cantidad <= 1) return;
+    setComidas((prev) => prev.filter((_, i) => i !== indice));
+    setCantidad((c) => c - 1);
+    setPaso((p) => Math.max(0, p - 1));
+    setResumenVisitado(false);
   }
 
   function puedeAvanzar() {
@@ -648,7 +730,13 @@ export function PedidoWizard({
             comidas={comidas.slice(0, paso - 1)}
             proteinas={proteinas}
             platos={platos}
+            modo={modo}
+            opcionesDesayuno={opcionesDesayuno}
+            extrasConfig={extrasConfig}
+            carbohidratosFull={carbohidratosFull}
+            vegetalesFull={vegetalesFull}
             onEditar={(i) => setPaso(i + 1)}
+            onDuplicar={duplicarComida}
           />
         )}
 
@@ -707,6 +795,8 @@ export function PedidoWizard({
             descuentoPct={descuentoPct}
             total={total}
             onEditarPaso={setPaso}
+            onDuplicarComida={duplicarComida}
+            onEliminarComida={eliminarComida}
             onCambiarCodigo={() => setMostrarModalDescuento(true)}
             extrasConfig={extrasConfig}
             platos={platos}
@@ -750,12 +840,16 @@ export function PedidoWizard({
           <div className="sticky bottom-0 bg-white border-t-[1.5px] border-[#E6E2C8] px-5 py-3.5 z-30 shadow-xs">
         <div className="max-w-[480px] mx-auto flex items-center justify-between gap-3">
           <div className="flex flex-col leading-tight">
-            <span className="text-[11px] font-bold tracking-[0.06em] text-[#4A5A3C]">
-              {t.common.orderTotal}
-            </span>
-            <span className="font-poppins font-extrabold text-xl text-[#17330A]">
-              {formatearMoneda(total)}
-            </span>
+            {total > 0 && (
+              <>
+                <span className="text-[11px] font-bold tracking-[0.06em] text-[#4A5A3C]">
+                  {t.common.orderTotal}:
+                </span>
+                <span className="font-poppins font-extrabold text-xl text-[#17330A]">
+                  {formatearMoneda(total)}
+                </span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-2 flex-1 justify-end">
@@ -775,7 +869,7 @@ export function PedidoWizard({
                 type="button"
                 onClick={siguiente}
                 disabled={!puedeAvanzar()}
-                className="flex-1 max-w-[200px] min-h-[52px] rounded-full bg-[#FDC305] hover:bg-[#FFD43B] text-[#17330A] font-poppins font-bold text-[17px] flex items-center justify-center transition-all active:scale-95 shadow-2xs disabled:bg-[#D9D5B8] disabled:text-[#3F4635] disabled:cursor-not-allowed cursor-pointer"
+                className="flex-1 max-w-[200px] min-h-[52px] rounded-full bg-[#2F6E00] hover:bg-[#285F00] text-white font-poppins font-bold text-[17px] flex items-center justify-center transition-all active:scale-95 shadow-2xs disabled:bg-[#D9D5B8] disabled:text-[#3F4635] disabled:cursor-not-allowed cursor-pointer"
               >
                 {resumenVisitado ? t.wizard.summaryButton : t.common.next}
               </button>
@@ -784,7 +878,7 @@ export function PedidoWizard({
                 type="button"
                 onClick={() => enviar()}
                 disabled={enviando || enviado}
-                className="flex-1 max-w-[240px] min-h-[52px] rounded-full bg-[#FDC305] hover:bg-[#FFD43B] text-[#17330A] font-poppins font-bold text-[15px] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-2xs disabled:bg-[#D9D5B8] disabled:text-[#3F4635] disabled:cursor-not-allowed cursor-pointer"
+                className="flex-1 max-w-[240px] min-h-[52px] rounded-full bg-[#2F6E00] hover:bg-[#285F00] text-white font-poppins font-bold text-[15px] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-2xs disabled:bg-[#D9D5B8] disabled:text-[#3F4635] disabled:cursor-not-allowed cursor-pointer"
               >
                 {t.wizard.sendWhatsApp}
               </button>
@@ -1790,7 +1884,6 @@ function PasoEntrega({
   const { t, lang } = useLanguage();
   const telefonoInvalido =
     telefono.trim().length > 0 && !TELEFONO_US_REGEX.test(telefono.trim());
-  const sedeElegida = sedes.find((s) => s.id === sedeId) ?? null;
   const lblTitulo =
     tipoEntrega === "delivery" ? t.wizard.deliveryAddress : t.wizard.pickupLocation;
   const lblDia =
@@ -1846,73 +1939,86 @@ function PasoEntrega({
         {t.wizard.ordersOpen}
       </div>
 
-      <div className="lbl">{
-        lblTitulo
-      }</div>
+      <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]">
+        {lblTitulo}
+      </div>
 
       {tipoEntrega === "delivery" ? (
-        <div className="space-y-2">
-          <div
-            className="in mt-[8px]"
-          >
+        <div className="space-y-2.5">
+          <div className="relative">
+            <MapPin
+              className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#2F6E00]"
+              strokeWidth={2}
+            />
             <input
               type="text"
               value={direccionEntrega}
               onChange={(e) => onDireccionEntregaChange(e.target.value)}
               placeholder={t.wizard.street}
-              className="w-full h-full px-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150]"
+              className="w-full rounded-xl border border-[#CFC7B0] bg-white py-3 pl-10 pr-3.5 text-base text-[#1D2B14] placeholder:text-[#8E9685] focus:border-[#2F6E00] focus:outline-none focus:ring-2 focus:ring-[#2F6E00]/20"
             />
           </div>
-          <div
-            className="in"
-          >
-            <input
-              type="text"
-              placeholder={t.wizard.apt}
-              className="w-full h-full px-0 bg-transparent border-none text-[#5B6150] text-[15px] outline-none placeholder:text-[#5B6150]"
+          <input
+            type="text"
+            placeholder={t.wizard.apt}
+            className="w-full rounded-xl border border-[#CFC7B0] bg-white px-3.5 py-3 text-base text-[#1D2B14] placeholder:text-[#8E9685] focus:border-[#2F6E00] focus:outline-none focus:ring-2 focus:ring-[#2F6E00]/20"
+          />
+          <div className="flex items-center gap-2.5 rounded-xl bg-[#EAF4DC] px-3.5 py-3">
+            <Truck
+              className="h-[18px] w-[18px] flex-none text-[#2F6E00]"
+              strokeWidth={2}
             />
+            <span className="text-sm text-[#17330A]">
+              {t.wizard.deliveryZoneNote}
+            </span>
           </div>
-          <div className="note mt-4 p-[14px_16px] bg-[#EAF4DC] text-[15px]">
-            {t.wizard.deliveryZoneNote}
-          </div>
-        </div>
-      ) : sedes.length > 1 ? (
-        <div className="space-y-3">
-          {sedes.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => onSedeChange(s.id)}
-              className={`opt flex items-center gap-12 min-h-[56px] px-4 py-[10px_14px] rounded-[16px] border-[1.5px] text-[15px] transition-colors ${
-                sedeId === s.id
-                  ? "border-[#2F6E00] bg-[#EAF4DC]"
-                  : "border-[#CFCBA8] bg-white hover:border-[#2F6E00]/60"
-              }`}
-            >
-              <div className="th flex-none w-[56px] h-[56px] rounded-[12px] bg-[#FFF1B8]" />
-              <div className="flex-1">
-                <div className="font-bold">{s.direccion}</div>
-              </div>
-              {sedeId === s.id && <span className="text-[#2F6E00] font-extrabold">✓</span>}
-            </button>
-          ))}
         </div>
       ) : (
-        sedeElegida && (
-          <div className="opt flex items-center gap-12 min-h-[56px] px-4 py-[10px_14px] rounded-[16px] border-[1.5px] border-[#2F6E00] bg-[#EAF4DC] text-[15px]">
-            <div className="th flex-none w-[56px] h-[56px] rounded-[12px] bg-[#FFF1B8]" />
-            <div className="flex-1">
-              <div className="font-bold">{sedeElegida.direccion}</div>
-            </div>
-            <span className="text-[#2F6E00] font-extrabold">✓</span>
-          </div>
-        )
+        <div className="space-y-2.5">
+          {sedes.map((s) => {
+            const activa = sedeId === s.id;
+            const mostrarNombre = !s.direccion
+              .toLowerCase()
+              .includes(s.nombre.toLowerCase());
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => onSedeChange(s.id)}
+                aria-pressed={activa}
+                className={`flex w-full items-center gap-3 rounded-2xl border-[1.5px] bg-white px-3.5 py-3 text-left transition-colors ${
+                  activa
+                    ? "border-[#2F6E00]"
+                    : "border-[#D8D2BC] hover:border-[#2F6E00]/50"
+                }`}
+              >
+                <span
+                  className={`flex h-12 w-12 flex-none items-center justify-center rounded-xl ${
+                    activa ? "bg-[#EAF4DC]" : "bg-[#F1EDDC]"
+                  }`}
+                >
+                  <MapPin className="h-5 w-5 text-[#2F6E00]" strokeWidth={2} />
+                </span>
+                <span className="min-w-0 flex-1 space-y-0.5">
+                  <span className="block whitespace-pre-line text-[13px] leading-snug text-[#17330A]">
+                    {s.direccion}
+                  </span>
+                  {mostrarNombre && (
+                    <span className="block text-[13px] font-bold text-[#17330A]">
+                      {s.nombre}
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       )}
 
       <div className="space-y-1.5">
         <label
           htmlFor="customer-name"
-          className="block text-xs font-bold tracking-wider text-[#3D4A33] uppercase"
+          className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]"
         >
           {t.wizard.name}
         </label>
@@ -1922,14 +2028,14 @@ function PasoEntrega({
           value={nombre}
           onChange={(e) => onNombreChange(e.target.value)}
           placeholder={t.wizard.namePlaceholder}
-          className="w-full rounded-xl bg-white border border-[#CFC7B0] px-3.5 py-3 text-sm text-[#1D2B14] placeholder:text-[#8E9685] focus:outline-none focus:border-[#3B6E12] focus:ring-2 focus:ring-[#3B6E12]/20"
+          className="w-full rounded-xl border border-[#CFC7B0] bg-white px-3.5 py-3 text-base text-[#1D2B14] placeholder:text-[#8E9685] focus:border-[#2F6E00] focus:outline-none focus:ring-2 focus:ring-[#2F6E00]/20"
         />
       </div>
 
       <div className="space-y-1.5">
         <label
           htmlFor="customer-phone"
-          className="block text-xs font-bold tracking-wider text-[#3D4A33] uppercase"
+          className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]"
         >
           {t.wizard.phone}
         </label>
@@ -1942,7 +2048,7 @@ function PasoEntrega({
           onBlur={onTelefonoBlur}
           placeholder="(555) 123-4567"
           autoComplete="off"
-          className="w-full rounded-xl bg-white border border-[#CFC7B0] px-3.5 py-3 text-sm text-[#1D2B14] placeholder:text-[#8E9685] focus:outline-none focus:border-[#3B6E12] focus:ring-2 focus:ring-[#3B6E12]/20"
+          className="w-full rounded-xl border border-[#CFC7B0] bg-white px-3.5 py-3 text-base text-[#1D2B14] placeholder:text-[#8E9685] focus:border-[#2F6E00] focus:outline-none focus:ring-2 focus:ring-[#2F6E00]/20"
         />
         {telefonoInvalido && (
           <p className="text-xs text-error font-sans mt-2">
@@ -1954,7 +2060,7 @@ function PasoEntrega({
       <div className="space-y-1.5">
         <label
           htmlFor="additional-details"
-          className="block text-xs font-bold tracking-wider text-[#3D4A33] uppercase"
+          className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]"
         >
           {t.wizard.additional}
         </label>
@@ -1968,47 +2074,72 @@ function PasoEntrega({
               ? t.wizard.additionalDelivery
               : t.wizard.additionalPickup
           }
-          className="w-full rounded-xl bg-white border border-[#CFC7B0] px-3.5 py-2.5 text-sm text-[#1D2B14] placeholder:text-[#8E9685] resize-none focus:outline-none focus:border-[#3B6E12] focus:ring-2 focus:ring-[#3B6E12]/20"
+          className="w-full resize-none rounded-xl border border-[#CFC7B0] bg-white px-3.5 py-2.5 text-base text-[#1D2B14] placeholder:text-[#8E9685] focus:border-[#2F6E00] focus:outline-none focus:ring-2 focus:ring-[#2F6E00]/20"
         />
       </div>
 
-      <div className="lbl mt-[20px]">{lblDia}</div>
+      <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]">
+        {lblDia}
+      </div>
       {forzarProximaSemana && (
-        <p className="text-[12px] font-bold text-secondary bg-secondary/10 rounded-lg px-3 py-[1.5px] mt-[8px]">
+        <p className="-mt-3 rounded-lg bg-secondary/10 px-3 py-[1.5px] text-[12px] font-bold text-secondary">
           {t.wizard.schedulingNextWeek}
         </p>
       )}
-      <div className="row mt-[8px] flex gap-8 flex-wrap">
-        <Chip
-          label={etiquetaFecha(proximaFecha(0, forzarProximaSemana), lang)}
-          selected={diaEntrega === "domingo"}
-          onClick={() => onDiaChange("domingo")}
-          classNameOverride={`${
-            diaEntrega === "domingo"
-              ? "bg-[#2F6E00] border-[#2F6E00] text-white font-bold"
-              : "bg-white border-[#CFCBA8] text-[#17330A] font-medium"
-          }`}
-        />
-        <Chip
-          label={etiquetaFecha(proximaFecha(1, forzarProximaSemana), lang)}
-          selected={diaEntrega === "lunes"}
-          onClick={() => onDiaChange("lunes")}
-          classNameOverride={`${
-            diaEntrega === "lunes"
-              ? "bg-[#2F6E00] border-[#2F6E00] text-white font-bold"
-              : "bg-white border-[#CFCBA8] text-[#17330A] font-medium"
-          }`}
-        />
+      <div className="grid grid-cols-2 gap-2.5">
+        {[
+          {
+            dia: "domingo" as const,
+            label: etiquetaFecha(proximaFecha(0, forzarProximaSemana), lang),
+          },
+          {
+            dia: "lunes" as const,
+            label: etiquetaFecha(proximaFecha(1, forzarProximaSemana), lang),
+          },
+        ].map(({ dia, label }) => {
+          const activo = diaEntrega === dia;
+          return (
+            <button
+              key={dia}
+              type="button"
+              onClick={() => onDiaChange(dia)}
+              aria-pressed={activo}
+              className={`flex min-h-[44px] min-w-0 items-center gap-1.5 rounded-full border-[1.5px] px-2.5 py-2 text-[12px] transition-colors active:scale-95 ${
+                activo
+                  ? "border-[#2F6E00] bg-[#2F6E00] font-semibold text-white"
+                  : "border-[#CFC7B0] bg-white font-medium text-[#17330A] hover:border-[#2F6E00]/60"
+              }`}
+            >
+              <span
+                className={`flex h-[18px] w-[18px] flex-none items-center justify-center rounded-full ${
+                  activo
+                    ? "bg-white"
+                    : "border-2 border-[#17330A] bg-white"
+                }`}
+              >
+                {activo && (
+                  <span className="h-2 w-2 rounded-full bg-[#2F6E00]" />
+                )}
+              </span>
+              <span className="truncate">{label}</span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="chk mt-[24px] flex items-center justify-between">
+      <div className="mt-6 flex items-start justify-between gap-4">
         <div>
-          <span className="font-bold text-[13px] tracking-[0.06em] text-[#17330A]">
+          <span className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]">
             {t.wizard.rememberDetails}
           </span>
-          <p className="text-[11px] text-[#5C6B50] mt-0.5">Guardado de forma local en este dispositivo</p>
+          <p className="mt-1 text-xs text-[#5C6B50]">
+            {t.wizard.rememberDetailsHint}
+          </p>
         </div>
-        <div className="box w-[28px] h-[28px] rounded-[8px] border-[2px] border-[#17330A] bg-white flex items-center justify-center" />
+        <div
+          aria-hidden="true"
+          className="mt-0.5 h-7 w-7 flex-none rounded-lg border-2 border-[#17330A] bg-white"
+        />
       </div>
     </div>
   );
@@ -2028,6 +2159,8 @@ function PasoResumen({
   descuentoPct,
   total,
   onEditarPaso,
+  onDuplicarComida,
+  onEliminarComida,
   onCambiarCodigo,
   extrasConfig,
   platos = [],
@@ -2048,6 +2181,8 @@ function PasoResumen({
   descuentoPct: number;
   total: number;
   onEditarPaso: (paso: number) => void;
+  onDuplicarComida: (indice: number) => void;
+  onEliminarComida: (indice: number) => void;
   onCambiarCodigo: () => void;
   extrasConfig?: ExtrasConfig;
   platos?: OpcionMenu[];
@@ -2098,13 +2233,13 @@ function PasoResumen({
                 : c.tipo === "keto"
                   ? t.wizard.keto
                   : t.wizard.regularMeal;
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onEditarPaso(i + 1)}
-              className="w-full text-left p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white flex flex-col gap-2 transition-colors hover:border-[#2F6E00]/60"
-            >
+           return (
+             <div key={i} className="space-y-1">
+              <button
+                type="button"
+                onClick={() => onEditarPaso(i + 1)}
+                className="w-full text-left p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white flex flex-col gap-2 transition-colors hover:border-[#2F6E00]/60"
+              >
               <div className="flex justify-between items-start">
                 <span className="text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] uppercase">
                   {t.wizard.mealEdit(i + 1, tipoLabel)}
@@ -2136,6 +2271,23 @@ function PasoResumen({
                 </div>
               )}
             </button>
+            <div className="flex gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => onDuplicarComida(i)}
+                className="text-[11px] font-bold text-[#2F6E00] uppercase tracking-wider px-3 py-1.5 rounded-lg border border-[#CFCBA8] bg-white hover:border-[#2F6E00]/60 transition-colors"
+              >
+                {t.wizard.copyPrevious}
+              </button>
+              <button
+                type="button"
+                onClick={() => onEliminarComida(i)}
+                className="text-[11px] font-bold text-red-600 uppercase tracking-wider px-3 py-1.5 rounded-lg border border-[#CFCBA8] bg-white hover:border-red-300 transition-colors"
+              >
+                {t.common.cancel}
+              </button>
+            </div>
+            </div>
           );
         })}
       </div>
