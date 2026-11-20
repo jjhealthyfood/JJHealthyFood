@@ -11,7 +11,7 @@ create table if not exists public.sugerencias (
 
 alter table public.sugerencias enable row level security;
 
-do 
+do $$
 begin
   if not exists (
     select 1 from pg_policies
@@ -33,4 +33,4 @@ begin
       to authenticated
       using (true);
   end if;
-end ;
+end $$;

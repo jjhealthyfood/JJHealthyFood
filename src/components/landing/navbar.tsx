@@ -19,6 +19,7 @@ export function Navbar() {
         {/* Brand */}
         <Link
           href="/"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           aria-label="JJ Meals — home"
           className="group flex shrink-0 items-center gap-2 rounded-full sm:gap-3"
         >
