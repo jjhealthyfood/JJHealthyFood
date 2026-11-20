@@ -184,19 +184,21 @@ function ChipSimple({
   pending,
   esDesayuno = false,
   esPlato = false,
+  esKeto = false,
 }: {
   opcion: OpcionMenu;
   onQuitar: () => void;
   pending: boolean;
   esDesayuno?: boolean;
   esPlato?: boolean;
+  esKeto?: boolean;
 }) {
   return (
     <div className="inline-flex items-center gap-2 pl-3 pr-1.5 py-2 rounded-xl bg-surface-container-low border border-outline-variant">
       <span className="font-sans text-sm text-on-surface font-medium">
         {opcion.nombre}
       </span>
-      {esDesayuno && <PrecioRacionEditor opcion={opcion} />}
+      {(esDesayuno || esKeto) && <PrecioRacionEditor opcion={opcion} />}
       {esPlato && (
         <>
           <PrecioRacionEditor opcion={opcion} />
@@ -225,6 +227,7 @@ export function MenuCategoria({
   todosLosNombres,
   esProteina = false,
   esPlato = false,
+  esKeto = false,
 }: {
   categoria: CategoriaMenu;
   titulo: string;
@@ -232,6 +235,7 @@ export function MenuCategoria({
   todosLosNombres?: string[];
   esProteina?: boolean;
   esPlato?: boolean;
+  esKeto?: boolean;
 }) {
   const [tab, setTab] = useState<TabTipo>("racion");
   const [nuevo, setNuevo] = useState("");
@@ -239,6 +243,7 @@ export function MenuCategoria({
   const [precioRacion, setPrecioRacion] = useState(esPlato ? "9" : "9");
   const [precioMacro, setPrecioMacro] = useState(esPlato ? "12" : "12");
   const [precioDesayuno, setPrecioDesayuno] = useState("7");
+  const [precioKeto, setPrecioKeto] = useState("12");
   const [pending, startTransition] = useTransition();
   const [errorNombre, setErrorNombre] = useState("");
   const [eliminados, setEliminados] = useState<string[]>([]);
@@ -285,6 +290,12 @@ export function MenuCategoria({
           precioRacion: tab === "racion" ? precio || 0 : Number(preciosDefault[nivel].racion),
           precioMacroGramo: tab === "macro" ? precio || 0 : Number(preciosDefault[nivel].macro),
         });
+      } else if (esKeto) {
+        await crearOpcionMenu(categoria, nombre, {
+          precioRacion: Number(precioKeto) || 12,
+          precioMacroGramo: Number(precioKeto) || 12,
+          esKeto: true,
+        });
       } else if (esPlato) {
         await crearOpcionMenu(categoria, nombre, {
           precioRacion: Number(precioRacion) || 9,
@@ -318,9 +329,16 @@ export function MenuCategoria({
 
   return (
     <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-5 md:p-6">
-      <h3 className="font-display text-lg font-semibold text-on-surface mb-4">
-        {titulo}
-      </h3>
+      <div className="flex items-center gap-2 mb-4">
+        <h3 className="font-display text-lg font-semibold text-on-surface">
+          {titulo}
+        </h3>
+        {esKeto && (
+          <span className="text-[10px] font-bold uppercase tracking-wider bg-[#2F6E00] text-white px-2.5 py-0.5 rounded-full">
+            Keto
+          </span>
+        )}
+      </div>
 
       {esProteina ? (
         <>
@@ -520,6 +538,7 @@ export function MenuCategoria({
                 pending={pending}
                 esDesayuno={categoria === "desayuno"}
                 esPlato={esPlato}
+                esKeto={esKeto}
               />
             ))}
           </div>
@@ -536,10 +555,24 @@ export function MenuCategoria({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") agregar();
                 }}
-                placeholder={esPlato ? "Nombre del plato..." : "Nueva opción..."}
+                placeholder={esKeto ? "Nombre del plato keto..." : esPlato ? "Nombre del plato..." : "Nueva opción..."}
                 disabled={pending}
                 className="flex-1 min-w-[140px] h-10 px-3 bg-surface-container-low border border-outline-variant rounded-xl font-sans text-sm focus:ring-2 focus:ring-primary outline-none"
               />
+              {esKeto && (
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-on-surface-variant font-sans">precio</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="1"
+                    value={precioKeto}
+                    onChange={(e) => setPrecioKeto(e.target.value)}
+                    disabled={pending}
+                    className="w-20 h-10 px-2 bg-surface-container-low border border-outline-variant rounded-xl font-sans text-sm outline-none"
+                  />
+                </div>
+              )}
               {categoria === "desayuno" && (
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-on-surface-variant font-sans">precio</span>

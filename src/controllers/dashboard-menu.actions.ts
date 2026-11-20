@@ -23,6 +23,7 @@ export async function crearOpcionMenu(
     precioRacion?: number;
     precioMacroGramo?: number;
     precioExtra?: number;
+    esKeto?: boolean;
   }
 ) {
   const limpio = nombre.trim();
@@ -155,6 +156,24 @@ export async function recargarMenuCompleto() {
       categoria: "desayuno",
       nombre,
       orden,
+    });
+  }
+
+  // Platos Keto
+  const platosKeto: [string, number, number][] = [
+    ["Lasagna berenjena", 1, 12],
+    ["Spaghetti zucchini", 2, 10],
+    ["Salmon bowl", 3, 10],
+  ];
+
+  for (const [nombre, orden, precio] of platosKeto) {
+    await supabase.from("opciones_menu").insert({
+      categoria: "plato",
+      nombre,
+      precio_racion: precio,
+      precio_macro_gramo: precio,
+      orden: 100 + orden,
+      es_keto: true,
     });
   }
 

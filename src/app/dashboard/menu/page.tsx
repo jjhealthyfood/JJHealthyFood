@@ -28,6 +28,8 @@ export default async function MenuSemanalPage() {
   const vegetales = opciones.filter((o) => o.categoria === "vegetal");
   const desayuno = opciones.filter((o) => o.categoria === "desayuno");
   const platos = opciones.filter((o) => o.categoria === "plato");
+  const proteinasKeto = proteinas.filter((o) => o.es_keto);
+  const platosKeto = platos.filter((o) => o.es_keto);
   const todosLosNombres = opciones.map((o) => o.nombre);
 
   return (
@@ -91,6 +93,21 @@ export default async function MenuSemanalPage() {
           opciones={platos}
           todosLosNombres={todosLosNombres}
           esPlato
+        />
+        <MenuCategoria
+          categoria="proteina"
+          titulo="Proteínas Keto"
+          opciones={proteinasKeto}
+          todosLosNombres={todosLosNombres}
+          esProteina
+          esKeto
+        />
+        <MenuCategoria
+          categoria="plato"
+          titulo="Platos Keto"
+          opciones={platosKeto}
+          todosLosNombres={todosLosNombres}
+          esKeto
         />
         <ExtrasConfigPanel
           config={extrasConfig}

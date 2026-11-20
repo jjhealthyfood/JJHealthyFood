@@ -231,14 +231,16 @@ function precioExtraDeItem(
   return 0;
 }
 
-function faseTexto(paso: number, cantidad: number, t: Dict) {
+function faseTexto(paso: number, cantidad: number, t: Dict, comidaEnEdicion: number | null = null) {
+  if (comidaEnEdicion !== null) return t.wizard.editingMeal(comidaEnEdicion + 1, cantidad);
   if (paso === 0) return t.wizard.stepSetup;
   if (paso <= cantidad) return t.wizard.stepMeal(paso, cantidad);
   if (paso === cantidad + 1) return t.wizard.stepPickupDelivery;
   return t.wizard.stepSummaryCheckout;
 }
 
-function porcentajeProgreso(paso: number, cantidad: number) {
+function porcentajeProgreso(paso: number, cantidad: number, comidaEnEdicion: number | null = null, pasoPrevio: number | null = null) {
+  if (comidaEnEdicion !== null && pasoPrevio !== null) return porcentajeProgreso(pasoPrevio, cantidad);
   if (paso === 0) return 25;
   if (paso <= cantidad) return 25 + Math.round((paso / Math.max(1, cantidad)) * 25);
   if (paso === cantidad + 1) return 75;
@@ -277,6 +279,7 @@ function ResumenParcial({
   vegetalesFull = [],
   onEditar,
   onDuplicar,
+  onEliminar,
 }: {
   comidas: ComidaSlot[];
   proteinas: OpcionMenu[];
@@ -288,6 +291,7 @@ function ResumenParcial({
   vegetalesFull?: OpcionMenu[];
   onEditar: (indice: number) => void;
   onDuplicar: (indice: number) => void;
+  onEliminar?: (indice: number) => void;
 }) {
   const [expandido, setExpandido] = useState(true);
   const { t } = useLanguage();
@@ -356,10 +360,21 @@ function ResumenParcial({
                 onClick={() => onDuplicar(i)}
                 aria-label={t.common.duplicate}
                 title={t.common.duplicate}
-                className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[#2F6E00] hover:bg-[#EAF4DC] transition-colors"
+                className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[#2F6E00] hover:bg-[#EAF4DC] transition-colors cursor-pointer"
               >
                 <Copy size={13} />
               </button>
+              {onEliminar && (
+                <button
+                  type="button"
+                  onClick={() => onEliminar(i)}
+                  aria-label={t.common.remove}
+                  title={t.common.remove}
+                  className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -423,6 +438,9 @@ export function PedidoWizard({
   const [descuentoPct, setDescuentoPct] = useState(0);
   const [errorCodigo, setErrorCodigo] = useState("");
   const [validandoCodigo, setValidandoCodigo] = useState(false);
+  const [comidaEnEdicion, setComidaEnEdicion] = useState<number | null>(null);
+  const [pasoPrevioEdicion, setPasoPrevioEdicion] = useState<number | null>(null);
+  const [toastDeshacer, setToastDeshacer] = useState<{ index: number } | null>(null);
 
   const totalPasos = cantidad + 3; // 0: setup, 1..N: comidas, N+1: entrega, N+2: resumen
   const esPasoSetup = paso === 0;
@@ -433,6 +451,12 @@ export function PedidoWizard({
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [paso]);
+
+  useEffect(() => {
+    if (!toastDeshacer) return;
+    const timer = setTimeout(() => setToastDeshacer(null), 5000);
+    return () => clearTimeout(timer);
+  }, [toastDeshacer]);
 
   function mostrarModalDescuentoSiCorresponde() {
     if (!modalDescuentoVisto) {
@@ -469,11 +493,15 @@ export function PedidoWizard({
       return copia.slice(0, Math.max(limitada, copia.length));
     });
     setResumenVisitado(false);
+    setComidaEnEdicion(null);
+    setPasoPrevioEdicion(null);
   }
 
   function cambiarModo(nuevoModo: ModoPedido) {
     setModo(nuevoModo);
     setResumenVisitado(false);
+    setComidaEnEdicion(null);
+    setPasoPrevioEdicion(null);
   }
 
   function actualizarComida(indice: number, cambios: Partial<ComidaSlot>) {
@@ -517,17 +545,63 @@ export function PedidoWizard({
       return copia;
     });
     setCantidad((c) => c + 1);
-    // El indice de la comida actual (o del resumen) se corre uno hacia abajo.
-    setPaso((p) => p + 1);
-    setResumenVisitado(false);
+    setToastDeshacer({ index: indice + 1 });
+    if (resumenVisitado || esPasoResumen) {
+      setResumenVisitado(true);
+      if (esPasoResumen) {
+        setPaso((p) => p + 1);
+      }
+    } else {
+      setPaso((p) => p + 1);
+    }
   }
 
   function eliminarComida(indice: number) {
     if (cantidad <= 1) return;
     setComidas((prev) => prev.filter((_, i) => i !== indice));
     setCantidad((c) => c - 1);
-    setPaso((p) => Math.max(0, p - 1));
-    setResumenVisitado(false);
+    setToastDeshacer(null);
+    if (resumenVisitado || esPasoResumen) {
+      setResumenVisitado(true);
+      if (esPasoResumen) {
+        setPaso((p) => Math.max(0, p - 1));
+      }
+    } else {
+      if (paso - 1 >= indice) {
+        setPaso((p) => Math.max(1, p - 1));
+      }
+    }
+  }
+
+  function iniciarEdicionComida(indice: number) {
+    setPasoPrevioEdicion(paso);
+    setComidaEnEdicion(indice);
+    setPaso(indice + 1);
+  }
+
+  function editarSetup() {
+    setPasoPrevioEdicion(paso);
+    setPaso(0);
+  }
+
+  function editarEntrega() {
+    setPasoPrevioEdicion(paso);
+    setPaso(cantidad + 1);
+  }
+
+  function volverDeEdicion() {
+    const destino = pasoPrevioEdicion ?? (totalPasos - 1);
+    setPaso(destino);
+    setComidaEnEdicion(null);
+    setPasoPrevioEdicion(null);
+    if (destino === totalPasos - 1) {
+      setResumenVisitado(true);
+    }
+  }
+
+  function guardarYVolverDeEdicion() {
+    if (!puedeAvanzar()) return;
+    volverDeEdicion();
   }
 
   function puedeAvanzar() {
@@ -556,8 +630,13 @@ export function PedidoWizard({
 
   function siguiente() {
     if (!puedeAvanzar()) return;
+    if (comidaEnEdicion !== null) {
+      guardarYVolverDeEdicion();
+      return;
+    }
     if (resumenVisitado) {
       setPaso(totalPasos - 1);
+      setPasoPrevioEdicion(null);
       mostrarModalDescuentoSiCorresponde();
       return;
     }
@@ -571,11 +650,16 @@ export function PedidoWizard({
     setPaso(nuevoPaso);
     if (nuevoPaso === totalPasos - 1) {
       setResumenVisitado(true);
+      setPasoPrevioEdicion(null);
       mostrarModalDescuentoSiCorresponde();
     }
   }
 
   function atras() {
+    if (comidaEnEdicion !== null || (pasoPrevioEdicion !== null && (paso === 0 || paso === cantidad + 1))) {
+      volverDeEdicion();
+      return;
+    }
     setPaso((p) => Math.max(p - 1, 0));
   }
 
@@ -704,12 +788,12 @@ export function PedidoWizard({
       {!enviado && (
         <div className="max-w-[480px] w-full mx-auto px-5 pt-5 pb-1">
           <div className="font-sans text-sm font-medium text-[#17330A] mb-2">
-            {faseTexto(paso, cantidad, t)}
+            {faseTexto(paso, cantidad, t, comidaEnEdicion)}
           </div>
           <div className="h-2 rounded-full bg-[#EDE9CF] overflow-hidden">
             <div
               className="h-full bg-[#2F6E00] rounded-full transition-all duration-300"
-              style={{ width: `${porcentajeProgreso(paso, cantidad)}%` }}
+              style={{ width: `${porcentajeProgreso(paso, cantidad, comidaEnEdicion, pasoPrevioEdicion)}%` }}
             />
           </div>
         </div>
@@ -725,7 +809,7 @@ export function PedidoWizard({
           />
         )}
 
-        {esPasoComida && (
+        {esPasoComida && comidaEnEdicion === null && (
           <ResumenParcial
             comidas={comidas.slice(0, paso - 1)}
             proteinas={proteinas}
@@ -735,9 +819,32 @@ export function PedidoWizard({
             extrasConfig={extrasConfig}
             carbohidratosFull={carbohidratosFull}
             vegetalesFull={vegetalesFull}
-            onEditar={(i) => setPaso(i + 1)}
+            onEditar={iniciarEdicionComida}
             onDuplicar={duplicarComida}
+            onEliminar={eliminarComida}
           />
+        )}
+
+        {esPasoComida && comidaEnEdicion !== null && (
+          <div className="mb-4 flex items-center justify-between rounded-2xl bg-[#EAF4DC] border border-[#2F6E00]/30 px-4 py-3">
+            <div className="flex items-center gap-2.5">
+              <span className="w-6 h-6 rounded-full bg-[#2F6E00] text-white text-xs font-bold flex items-center justify-center">
+                {comidaEnEdicion + 1}
+              </span>
+              <span className="text-sm font-bold text-[#17330A]">
+                {t.wizard.editingMealBadge(comidaEnEdicion + 1)}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={volverDeEdicion}
+              className="text-xs font-semibold text-[#2F6E00] hover:text-[#17330A] transition-colors cursor-pointer"
+            >
+              {pasoPrevioEdicion === totalPasos - 1
+                ? t.wizard.returnToSummary
+                : t.wizard.returnToOrder}
+            </button>
+          </div>
         )}
 
         {esPasoComida && (
@@ -795,6 +902,9 @@ export function PedidoWizard({
             descuentoPct={descuentoPct}
             total={total}
             onEditarPaso={setPaso}
+            onEditarComida={iniciarEdicionComida}
+            onEditarSetup={editarSetup}
+            onEditarEntrega={editarEntrega}
             onDuplicarComida={duplicarComida}
             onEliminarComida={eliminarComida}
             onCambiarCodigo={() => setMostrarModalDescuento(true)}
@@ -853,18 +963,31 @@ export function PedidoWizard({
           </div>
 
           <div className="flex items-center gap-2 flex-1 justify-end">
-            {paso > 0 && !enviado && (
+            {(paso > 0 || (pasoPrevioEdicion !== null && paso === 0)) && !enviado && (
               <button
                 type="button"
                 onClick={atras}
                 className="min-h-[48px] px-3 text-[#4A5A3C] hover:text-[#17330A] font-medium text-sm flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
               >
                 <ChevronLeft size={18} />
-                {t.common.back}
+                {comidaEnEdicion !== null && pasoPrevioEdicion === totalPasos - 1
+                  ? t.wizard.returnToSummary
+                  : pasoPrevioEdicion !== null && paso === 0
+                    ? t.wizard.returnToSummary
+                    : t.common.back}
               </button>
             )}
 
-            {!esPasoResumen ? (
+            {comidaEnEdicion !== null ? (
+              <button
+                type="button"
+                onClick={guardarYVolverDeEdicion}
+                disabled={!puedeAvanzar()}
+                className="flex-1 max-w-[220px] min-h-[52px] rounded-full bg-[#2F6E00] hover:bg-[#285F00] text-white font-poppins font-bold text-[16px] flex items-center justify-center transition-all active:scale-95 shadow-2xs disabled:bg-[#D9D5B8] disabled:text-[#3F4635] disabled:cursor-not-allowed cursor-pointer"
+              >
+                {pasoPrevioEdicion === totalPasos - 1 ? t.wizard.saveAndReturn : t.common.done}
+              </button>
+            ) : !esPasoResumen ? (
               <button
                 type="button"
                 onClick={siguiente}
@@ -887,6 +1010,22 @@ export function PedidoWizard({
         </div>
           </div>
         </>
+      )}
+
+      {toastDeshacer && !enviado && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-[#17330A] text-white px-4 py-2.5 rounded-full shadow-lg flex items-center gap-3 text-sm animate-in fade-in slide-in-from-bottom-2">
+          <span>{t.wizard.mealDuplicated}</span>
+          <button
+            type="button"
+            onClick={() => {
+              eliminarComida(toastDeshacer.index);
+              setToastDeshacer(null);
+            }}
+            className="font-bold text-[#FDC305] hover:text-[#FFE066] transition-colors cursor-pointer underline"
+          >
+            {t.common.undo}
+          </button>
+        </div>
       )}
 
       {mostrarAvisoCorte && (
@@ -1310,6 +1449,7 @@ function PasoComida({
                     extras: [],
                   })
                 }
+                className="w-full justify-center text-center"
               />
             ))}
           </div>
@@ -1448,6 +1588,7 @@ function PasoComida({
                     label={`${o.nombre} — $${precio}`}
                     selected={comida.proteinaId === o.id}
                     onClick={() => onCambiar({ proteinaId: o.id })}
+                    className="w-full justify-center text-center"
                   />
                 );
               })}
@@ -1551,6 +1692,7 @@ function PasoComida({
                 label={`${o.nombre} — $${Number(o.precio_racion) || 7}`}
                 selected={comida.carbohidrato === o.nombre}
                 onClick={() => onCambiar({ carbohidrato: o.nombre, proteinaId: o.nombre })}
+                className="w-full justify-center text-center"
               />
             ))}
           </div>
@@ -2159,6 +2301,9 @@ function PasoResumen({
   descuentoPct,
   total,
   onEditarPaso,
+  onEditarComida,
+  onEditarSetup,
+  onEditarEntrega,
   onDuplicarComida,
   onEliminarComida,
   onCambiarCodigo,
@@ -2180,7 +2325,10 @@ function PasoResumen({
   subtotal: number;
   descuentoPct: number;
   total: number;
-  onEditarPaso: (paso: number) => void;
+  onEditarPaso?: (paso: number) => void;
+  onEditarComida?: (indice: number) => void;
+  onEditarSetup?: () => void;
+  onEditarEntrega?: () => void;
   onDuplicarComida: (indice: number) => void;
   onEliminarComida: (indice: number) => void;
   onCambiarCodigo: () => void;
@@ -2203,8 +2351,8 @@ function PasoResumen({
       {/* Setup summary */}
       <button
         type="button"
-        onClick={() => onEditarPaso(0)}
-        className="w-full text-left p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white text-on-surface hover:border-[#2F6E00]/60 transition-colors flex items-center gap-12"
+        onClick={onEditarSetup ?? (() => onEditarPaso?.(0))}
+        className="w-full text-left p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white text-on-surface hover:border-[#2F6E00]/60 transition-colors flex items-center gap-12 cursor-pointer"
       >
         <div className="flex-1">
           <div className="flex justify-between items-center">
@@ -2237,8 +2385,8 @@ function PasoResumen({
              <div key={i} className="space-y-1">
               <button
                 type="button"
-                onClick={() => onEditarPaso(i + 1)}
-                className="w-full text-left p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white flex flex-col gap-2 transition-colors hover:border-[#2F6E00]/60"
+                onClick={() => (onEditarComida ? onEditarComida(i) : onEditarPaso?.(i + 1))}
+                className="w-full text-left p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white flex flex-col gap-2 transition-colors hover:border-[#2F6E00]/60 cursor-pointer"
               >
               <div className="flex justify-between items-start">
                 <span className="text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] uppercase">
@@ -2275,16 +2423,18 @@ function PasoResumen({
               <button
                 type="button"
                 onClick={() => onDuplicarComida(i)}
-                className="text-[11px] font-bold text-[#2F6E00] uppercase tracking-wider px-3 py-1.5 rounded-lg border border-[#CFCBA8] bg-white hover:border-[#2F6E00]/60 transition-colors"
+                className="text-[11px] font-bold text-[#2F6E00] uppercase tracking-wider px-3 py-1.5 rounded-lg border border-[#CFCBA8] bg-white hover:border-[#2F6E00]/60 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
-                {t.wizard.copyPrevious}
+                <Copy size={12} />
+                {t.common.duplicate}
               </button>
               <button
                 type="button"
                 onClick={() => onEliminarComida(i)}
-                className="text-[11px] font-bold text-red-600 uppercase tracking-wider px-3 py-1.5 rounded-lg border border-[#CFCBA8] bg-white hover:border-red-300 transition-colors"
+                className="text-[11px] font-bold text-red-600 uppercase tracking-wider px-3 py-1.5 rounded-lg border border-[#CFCBA8] bg-white hover:border-red-300 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
-                {t.common.cancel}
+                <Trash2 size={12} />
+                {t.common.remove}
               </button>
             </div>
             </div>
@@ -2309,9 +2459,16 @@ function PasoResumen({
         {descuentoPct > 0 ? t.wizard.changeCode : t.wizard.haveCode}
       </button>
 
-      <div className="opt w-full p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white">
-        <div className="text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] uppercase">
-          {tipoEntrega === "delivery" ? t.wizard.deliveryEdit : t.wizard.pickupEdit}
+      <button
+        type="button"
+        onClick={onEditarEntrega ?? (() => onEditarPaso?.(comidas.length + 1))}
+        className="opt w-full p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white text-left hover:border-[#2F6E00]/60 transition-colors cursor-pointer"
+      >
+        <div className="flex justify-between items-center">
+          <span className="text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] uppercase">
+            {tipoEntrega === "delivery" ? t.wizard.deliveryEdit : t.wizard.pickupEdit}
+          </span>
+          <Pencil size={13} className="text-[#2F6E00]" />
         </div>
         <div className="mt-[8px] text-sm leading-relaxed text-[#17330A] whitespace-pre-line">
           {nombre}
@@ -2338,7 +2495,7 @@ function PasoResumen({
               lang
             )}
         </div>
-      </div>
+      </button>
     </div>
   );
 }

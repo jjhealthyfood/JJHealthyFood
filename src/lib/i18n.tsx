@@ -21,6 +21,8 @@ const en = {
     remove: "Remove",
     cancel: "Cancel",
     close: "Close",
+    done: "Done",
+    undo: "Undo",
     orderTotal: "ORDER TOTAL",
     optional: "optional",
     free: "Free",
@@ -325,6 +327,12 @@ const en = {
     rememberDetails: "REMEMBER MY DETAILS FOR NEXT TIME",
     rememberDetailsHint: "Saved locally on this device",
     deliveryZoneNote: "Free delivery · Orlando Metro Area",
+    editingMeal: (n: number, total: number) => `Editing meal ${n} of ${total}`,
+    editingMealBadge: (n: number) => `Editing Meal ${n}`,
+    saveAndReturn: "Save & Return",
+    returnToSummary: "Back to summary",
+    returnToOrder: "Back to order",
+    mealDuplicated: "Meal duplicated",
   },
 };
 
@@ -340,6 +348,8 @@ const es: Dict = {
     remove: "Eliminar",
     cancel: "Cancelar",
     close: "Cerrar",
+    done: "Listo",
+    undo: "Deshacer",
     orderTotal: "TOTAL DEL PEDIDO",
     optional: "opcional",
     free: "Gratis",
@@ -644,6 +654,12 @@ const es: Dict = {
     rememberDetails: "RECORDAR MIS DATOS PARA LA PRÓXIMA VEZ",
     rememberDetailsHint: "Guardado de forma local en este dispositivo",
     deliveryZoneNote: "Entrega gratis · Orlando Metro Area",
+    editingMeal: (n: number, total: number) => `Editando comida ${n} de ${total}`,
+    editingMealBadge: (n: number) => `Editando Comida ${n}`,
+    saveAndReturn: "Guardar y volver",
+    returnToSummary: "Volver al resumen",
+    returnToOrder: "Volver al pedido",
+    mealDuplicated: "Comida duplicada",
   },
 };
 

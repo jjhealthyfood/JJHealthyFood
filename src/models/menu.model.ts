@@ -30,6 +30,7 @@ export async function agregarOpcionMenu(
     precioRacion?: number;
     precioMacroGramo?: number;
     precioExtra?: number;
+    esKeto?: boolean;
   }
 ): Promise<OpcionMenu> {
   const { data, error } = await supabase
@@ -40,6 +41,7 @@ export async function agregarOpcionMenu(
       nivel: detalles?.nivel ?? null,
       precio_racion: detalles?.precioRacion ?? null,
       precio_macro_gramo: detalles?.precioMacroGramo ?? null,
+      es_keto: detalles?.esKeto ?? false,
     })
     .select()
     .single();
