@@ -18,6 +18,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Chip } from "./chip";
+import { precioKeto, etiquetaPrecioKeto } from "@/lib/keto-precios";
 import { LanguageToggle, useLanguage, type Dict } from "@/lib/i18n";
 import {
   buscarClientaPorTelefono,
@@ -165,12 +166,10 @@ function precioComida(
     return 9;
   }
   if (slot.tipo === "keto") {
-    // En keto el precio lo define el plato (la proteína va incluida):
-    // Lasagna berenjena $12, Spaghetti zucchini $10, Salmon bowl $10.
+    // El precio del keto se define por la regla de keto-precios.ts.
     const plato = platos?.find((p) => p.nombre === slot.carbohidrato);
-    if (!plato) return 0;
-    const precioBD = Number(plato.precio_racion);
-    return !isNaN(precioBD) && precioBD > 0 ? precioBD : 0;
+    const proteina = proteinas.find((p) => p.id === slot.proteinaId);
+    return precioKeto(slot.carbohidrato, proteina?.nombre, plato?.precio_racion);
   }
   const proteina = proteinas.find((p) => p.id === slot.proteinaId);
   if (!proteina) return 0;
@@ -235,15 +234,17 @@ function faseTexto(paso: number, cantidad: number, t: Dict, comidaEnEdicion: num
   if (comidaEnEdicion !== null) return t.wizard.editingMeal(comidaEnEdicion + 1, cantidad);
   if (paso === 0) return t.wizard.stepSetup;
   if (paso <= cantidad) return t.wizard.stepMeal(paso, cantidad);
-  if (paso === cantidad + 1) return t.wizard.stepPickupDelivery;
+  if (paso === cantidad + 1) return t.wizard.stepReview;
+  if (paso === cantidad + 2) return t.wizard.stepPickupDelivery;
   return t.wizard.stepSummaryCheckout;
 }
 
 function porcentajeProgreso(paso: number, cantidad: number, comidaEnEdicion: number | null = null, pasoPrevio: number | null = null) {
   if (comidaEnEdicion !== null && pasoPrevio !== null) return porcentajeProgreso(pasoPrevio, cantidad);
-  if (paso === 0) return 25;
-  if (paso <= cantidad) return 25 + Math.round((paso / Math.max(1, cantidad)) * 25);
-  if (paso === cantidad + 1) return 75;
+  if (paso === 0) return 20;
+  if (paso <= cantidad) return 20 + Math.round((paso / Math.max(1, cantidad)) * 20);
+  if (paso === cantidad + 1) return 60;
+  if (paso === cantidad + 2) return 80;
   return 100;
 }
 
@@ -364,7 +365,7 @@ function ResumenParcial({
               >
                 <Copy size={13} />
               </button>
-              {onEliminar && (
+              {onEliminar && comidas.length > 1 && (
                 <button
                   type="button"
                   onClick={() => onEliminar(i)}
@@ -440,13 +441,20 @@ export function PedidoWizard({
   const [validandoCodigo, setValidandoCodigo] = useState(false);
   const [comidaEnEdicion, setComidaEnEdicion] = useState<number | null>(null);
   const [pasoPrevioEdicion, setPasoPrevioEdicion] = useState<number | null>(null);
+  const [volverA, setVolverA] = useState<"review" | "summary" | "meal" | null>(null);
+  const [comidaNueva, setComidaNueva] = useState<number | null>(null);
+  const [comentarioPedido, setComentarioPedido] = useState("");
+  const [alergias, setAlergias] = useState<"si" | "no" | "">("");
+  const [detalleAlergias, setDetalleAlergias] = useState("");
   const [toastDeshacer, setToastDeshacer] = useState<{ index: number } | null>(null);
 
-  const totalPasos = cantidad + 3; // 0: setup, 1..N: comidas, N+1: entrega, N+2: resumen
+  // 0: setup, 1..N: comidas, N+1: revision, N+2: entrega, N+3: resumen
+  const totalPasos = cantidad + 4;
   const esPasoSetup = paso === 0;
   const esPasoComida = paso >= 1 && paso <= cantidad;
-  const esPasoEntrega = paso === cantidad + 1;
-  const esPasoResumen = paso === cantidad + 2;
+  const esPasoRevision = paso === cantidad + 1;
+  const esPasoEntrega = paso === cantidad + 2;
+  const esPasoResumen = paso === cantidad + 3;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -495,6 +503,7 @@ export function PedidoWizard({
     setResumenVisitado(false);
     setComidaEnEdicion(null);
     setPasoPrevioEdicion(null);
+    setVolverA(null);
   }
 
   function cambiarModo(nuevoModo: ModoPedido) {
@@ -502,6 +511,7 @@ export function PedidoWizard({
     setResumenVisitado(false);
     setComidaEnEdicion(null);
     setPasoPrevioEdicion(null);
+    setVolverA(null);
   }
 
   function actualizarComida(indice: number, cambios: Partial<ComidaSlot>) {
@@ -546,14 +556,9 @@ export function PedidoWizard({
     });
     setCantidad((c) => c + 1);
     setToastDeshacer({ index: indice + 1 });
-    if (resumenVisitado || esPasoResumen) {
-      setResumenVisitado(true);
-      if (esPasoResumen) {
-        setPaso((p) => p + 1);
-      }
-    } else {
-      setPaso((p) => p + 1);
-    }
+    setResumenVisitado((v) => v || esPasoResumen);
+    // Duplicar corre un lugar todos los pasos que vienen despues.
+    setPaso((p) => p + 1);
   }
 
   function eliminarComida(indice: number) {
@@ -561,46 +566,95 @@ export function PedidoWizard({
     setComidas((prev) => prev.filter((_, i) => i !== indice));
     setCantidad((c) => c - 1);
     setToastDeshacer(null);
-    if (resumenVisitado || esPasoResumen) {
-      setResumenVisitado(true);
-      if (esPasoResumen) {
-        setPaso((p) => Math.max(0, p - 1));
-      }
-    } else {
-      if (paso - 1 >= indice) {
-        setPaso((p) => Math.max(1, p - 1));
-      }
+    if (comidaNueva !== null && comidaNueva >= indice) {
+      setComidaNueva(comidaNueva - 1);
+    }
+    if (esPasoRevision || esPasoResumen) {
+      setResumenVisitado((v) => v || esPasoResumen);
+      setPaso((p) => Math.max(0, p - 1));
+    } else if (paso - 1 >= indice) {
+      setPaso((p) => Math.max(1, p - 1));
     }
   }
 
-  function iniciarEdicionComida(indice: number) {
+  function origenEdicionActual(): "review" | "summary" | "meal" {
+    if (esPasoResumen) return "summary";
+    if (esPasoRevision) return "review";
+    return "meal";
+  }
+
+  function agregarComida() {
+    const indice = cantidad;
+    setComidas((prev) => [
+      ...prev.slice(0, cantidad),
+      { ...comidaVacia },
+    ]);
+    setCantidad((c) => c + 1);
+    setComidaNueva(indice);
     setPasoPrevioEdicion(paso);
+    setVolverA("review");
+    setComidaEnEdicion(indice);
+    setPaso(indice + 1);
+  }
+
+  function iniciarEdicionComida(indice: number) {
+    setComidaNueva(null);
+    setPasoPrevioEdicion(paso);
+    setVolverA(origenEdicionActual());
     setComidaEnEdicion(indice);
     setPaso(indice + 1);
   }
 
   function editarSetup() {
     setPasoPrevioEdicion(paso);
+    setVolverA(origenEdicionActual());
     setPaso(0);
   }
 
   function editarEntrega() {
     setPasoPrevioEdicion(paso);
-    setPaso(cantidad + 1);
+    setVolverA(origenEdicionActual());
+    setPaso(cantidad + 2);
   }
 
   function volverDeEdicion() {
-    const destino = pasoPrevioEdicion ?? (totalPasos - 1);
+    if (comidaNueva !== null) {
+      // Estaba creando una comida nueva: se descarta si no la guardo.
+      setComidas((prev) => prev.filter((_, i) => i !== comidaNueva));
+      setCantidad((c) => Math.max(1, c - 1));
+      setComidaNueva(null);
+      setComidaEnEdicion(null);
+      setPasoPrevioEdicion(null);
+      setVolverA(null);
+      setPaso(cantidad); // vuelve al paso de revision anterior
+      return;
+    }
+    const destino =
+      volverA === "summary"
+        ? cantidad + 3
+        : volverA === "review"
+          ? cantidad + 1
+          : pasoPrevioEdicion ?? (totalPasos - 1);
     setPaso(destino);
     setComidaEnEdicion(null);
     setPasoPrevioEdicion(null);
-    if (destino === totalPasos - 1) {
+    setVolverA(null);
+    if (destino === cantidad + 3) {
       setResumenVisitado(true);
     }
   }
 
   function guardarYVolverDeEdicion() {
     if (!puedeAvanzar()) return;
+    if (comidaNueva !== null) {
+      // La comida nueva ya quedo guardada: vuelve a revision.
+      setComidaNueva(null);
+      setComidaEnEdicion(null);
+      setPasoPrevioEdicion(null);
+      setVolverA(null);
+      setPaso(cantidad + 1);
+      return;
+    }
     volverDeEdicion();
   }
 
@@ -642,7 +696,7 @@ export function PedidoWizard({
     }
     const nuevoPaso = Math.min(paso + 1, totalPasos - 1);
 
-    if (!forzarProximaSemana && nuevoPaso === cantidad + 1 && !estaAntesDelCorte()) {
+    if (!forzarProximaSemana && nuevoPaso === cantidad + 2 && !estaAntesDelCorte()) {
       setMostrarAvisoCorte(true);
       return;
     }
@@ -656,7 +710,7 @@ export function PedidoWizard({
   }
 
   function atras() {
-    if (comidaEnEdicion !== null || (pasoPrevioEdicion !== null && (paso === 0 || paso === cantidad + 1))) {
+    if (comidaEnEdicion !== null || (pasoPrevioEdicion !== null && (paso === 0 || paso === cantidad + 2))) {
       volverDeEdicion();
       return;
     }
@@ -669,6 +723,20 @@ export function PedidoWizard({
     0
   );
   const total = subtotal - (subtotal * descuentoPct) / 100;
+
+  // El comentario del pedido y la alergia van en el mismo campo de notas
+  // ("Detalles" en la comanda), sin cambiar el diseno del ticket.
+  const notasPedido = [
+    comentarioPedido.trim() ? `Comentario: ${comentarioPedido.trim()}` : "",
+    alergias === "si"
+      ? `Alergias: Sí${detalleAlergias.trim() ? ` - ${detalleAlergias.trim()}` : ""}`
+      : alergias === "no"
+        ? "Alergias: No"
+        : "",
+    detalles.trim(),
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   function enviar(confirmarDuplicado = false) {
     if (!diaEntrega) return;
@@ -691,10 +759,12 @@ export function PedidoWizard({
     );
     const fechaEntregaIso = `${fechaEntregaReal.getFullYear()}-${String(fechaEntregaReal.getMonth() + 1).padStart(2, "0")}-${String(fechaEntregaReal.getDate()).padStart(2, "0")}`;
 
+    // El comentario del pedido y la alergia van en el mismo campo de notas
+    // ("Detalles" en la comanda), sin cambiar el diseno del ticket.
     const datosEntrega: DatosEntrega = {
       nombre: nombre.trim(),
       telefono: telefono.trim(),
-      detalles: detalles.trim(),
+      detalles: notasPedido,
       dia_entrega: diaEntrega,
       fecha_entrega: fechaEntregaIso,
       tipo_entrega: tipoEntrega,
@@ -793,7 +863,16 @@ export function PedidoWizard({
           <div className="h-2 rounded-full bg-[#EDE9CF] overflow-hidden">
             <div
               className="h-full bg-[#2F6E00] rounded-full transition-all duration-300"
-              style={{ width: `${porcentajeProgreso(paso, cantidad, comidaEnEdicion, pasoPrevioEdicion)}%` }}
+              style={{ width: `${porcentajeProgreso(
+                paso,
+                cantidad,
+                comidaEnEdicion,
+                volverA === "review"
+                  ? cantidad + 1
+                  : volverA === "summary"
+                    ? cantidad + 3
+                    : pasoPrevioEdicion
+              )}%` }}
             />
           </div>
         </div>
@@ -840,9 +919,13 @@ export function PedidoWizard({
               onClick={volverDeEdicion}
               className="text-xs font-semibold text-[#2F6E00] hover:text-[#17330A] transition-colors cursor-pointer"
             >
-              {pasoPrevioEdicion === totalPasos - 1
-                ? t.wizard.returnToSummary
-                : t.wizard.returnToOrder}
+              {comidaNueva !== null
+                ? t.common.cancel
+                : volverA === "summary"
+                  ? t.wizard.returnToSummary
+                  : volverA === "review"
+                    ? t.wizard.returnToReview
+                    : t.wizard.returnToOrder}
             </button>
           </div>
         )}
@@ -861,6 +944,29 @@ export function PedidoWizard({
             onCambiar={(cambios) => actualizarComida(paso - 1, cambios)}
             extrasConfig={extrasConfig}
             platos={platos}
+          />
+        )}
+
+        {esPasoRevision && (
+          <PasoRevision
+            comidas={comidasActivas}
+            modo={modo}
+            proteinas={proteinas}
+            opcionesDesayuno={opcionesDesayuno}
+            platos={platos}
+            extrasConfig={extrasConfig}
+            carbohidratosFull={carbohidratosFull}
+            vegetalesFull={vegetalesFull}
+            comentario={comentarioPedido}
+            onComentarioChange={setComentarioPedido}
+            alergias={alergias}
+            onAlergiasChange={setAlergias}
+            detalleAlergias={detalleAlergias}
+            onDetalleAlergiasChange={setDetalleAlergias}
+            onEditarComida={iniciarEdicionComida}
+            onDuplicarComida={duplicarComida}
+            onEliminarComida={eliminarComida}
+            onAgregarComida={agregarComida}
           />
         )}
 
@@ -901,6 +1007,9 @@ export function PedidoWizard({
             subtotal={subtotal}
             descuentoPct={descuentoPct}
             total={total}
+            comentarioPedido={comentarioPedido}
+            alergias={alergias}
+            detalleAlergias={detalleAlergias}
             onEditarPaso={setPaso}
             onEditarComida={iniciarEdicionComida}
             onEditarSetup={editarSetup}
@@ -921,7 +1030,7 @@ export function PedidoWizard({
             comidas={comidasActivas}
             nombre={nombre}
             telefono={telefono}
-            detalles={detalles}
+            detalles={notasPedido}
             diaEntrega={diaEntrega}
             sede={sedes.find((s) => s.id === sedeId) ?? null}
             tipoEntrega={tipoEntrega}
@@ -970,11 +1079,13 @@ export function PedidoWizard({
                 className="min-h-[48px] px-3 text-[#4A5A3C] hover:text-[#17330A] font-medium text-sm flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
               >
                 <ChevronLeft size={18} />
-                {comidaEnEdicion !== null && pasoPrevioEdicion === totalPasos - 1
-                  ? t.wizard.returnToSummary
-                  : pasoPrevioEdicion !== null && paso === 0
+                {comidaNueva !== null
+                  ? t.common.cancel
+                  : volverA === "summary"
                     ? t.wizard.returnToSummary
-                    : t.common.back}
+                    : volverA === "review"
+                      ? t.wizard.returnToReview
+                      : t.common.back}
               </button>
             )}
 
@@ -985,7 +1096,11 @@ export function PedidoWizard({
                 disabled={!puedeAvanzar()}
                 className="flex-1 max-w-[220px] min-h-[52px] rounded-full bg-[#2F6E00] hover:bg-[#285F00] text-white font-poppins font-bold text-[16px] flex items-center justify-center transition-all active:scale-95 shadow-2xs disabled:bg-[#D9D5B8] disabled:text-[#3F4635] disabled:cursor-not-allowed cursor-pointer"
               >
-                {pasoPrevioEdicion === totalPasos - 1 ? t.wizard.saveAndReturn : t.common.done}
+                {comidaNueva !== null ||
+                volverA === "review" ||
+                volverA === "summary"
+                  ? t.wizard.saveAndReturn
+                  : t.common.done}
               </button>
             ) : !esPasoResumen ? (
               <button
@@ -1438,7 +1553,7 @@ function PasoComida({
             {platosKeto.map((o) => (
               <Chip
                 key={o.id}
-                label={`${o.nombre} — $${Number(o.precio_racion) || 12}`}
+                label={`${o.nombre} — ${etiquetaPrecioKeto(o.nombre, o.precio_racion)}`}
                 selected={comida.carbohidrato === o.nombre}
                 onClick={() =>
                   onCambiar({
@@ -1472,7 +1587,7 @@ function PasoComida({
                   {proteinasKeto.map((p) => (
                     <Chip
                       key={p.id}
-                      label={p.nombre}
+                      label={`${p.nombre} — $${Number(p.precio_racion) || 0}`}
                       selected={comida.proteinaId === p.id}
                       onClick={() => onCambiar({ proteinaId: p.id })}
                     />
@@ -1480,7 +1595,7 @@ function PasoComida({
                 </div>
                 <p className="font-sans text-xs text-on-surface-variant">
                   {t.wizard.ketoPriceNote(
-                    formatearMoneda(Number(platoKetoElegido.precio_racion) || 0)
+                    etiquetaPrecioKeto(platoKetoElegido.nombre, platoKetoElegido.precio_racion)
                   )}
                 </p>
               </>
@@ -2077,10 +2192,6 @@ function PasoEntrega({
         </button>
       </div>
 
-      <div className="mt-4 rounded-[16px] bg-[#EAF4DC] p-[14px_16px] text-[15px]">
-        {t.wizard.ordersOpen}
-      </div>
-
       <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]">
         {lblTitulo}
       </div>
@@ -2269,6 +2380,10 @@ function PasoEntrega({
         })}
       </div>
 
+      <div className="mt-4 rounded-[16px] bg-[#EAF4DC] p-[14px_16px] text-[15px]">
+        {t.wizard.ordersOpen}
+      </div>
+
       <div className="mt-6 flex items-start justify-between gap-4">
         <div>
           <span className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]">
@@ -2287,6 +2402,244 @@ function PasoEntrega({
   );
 }
 
+function PasoRevision({
+  comidas,
+  modo,
+  proteinas,
+  opcionesDesayuno,
+  platos = [],
+  extrasConfig,
+  carbohidratosFull = [],
+  vegetalesFull = [],
+  comentario,
+  onComentarioChange,
+  alergias,
+  onAlergiasChange,
+  detalleAlergias,
+  onDetalleAlergiasChange,
+  onEditarComida,
+  onDuplicarComida,
+  onEliminarComida,
+  onAgregarComida,
+}: {
+  comidas: ComidaSlot[];
+  modo: ModoPedido;
+  proteinas: OpcionMenu[];
+  opcionesDesayuno: OpcionMenu[];
+  platos?: OpcionMenu[];
+  extrasConfig?: ExtrasConfig;
+  carbohidratosFull?: OpcionMenu[];
+  vegetalesFull?: OpcionMenu[];
+  comentario: string;
+  onComentarioChange: (valor: string) => void;
+  alergias: "si" | "no" | "";
+  onAlergiasChange: (valor: "si" | "no") => void;
+  detalleAlergias: string;
+  onDetalleAlergiasChange: (valor: string) => void;
+  onEditarComida: (indice: number) => void;
+  onDuplicarComida: (indice: number) => void;
+  onEliminarComida: (indice: number) => void;
+  onAgregarComida: () => void;
+}) {
+  const { t } = useLanguage();
+
+  return (
+    <div className="space-y-6 pb-2">
+      <div>
+        <h2 className="font-display text-[30px] font-extrabold text-[#17330A] mt-4 leading-tight">
+          {t.wizard.reviewTitle}
+        </h2>
+        <p className="sub">{t.wizard.reviewText}</p>
+      </div>
+
+      <div className="space-y-3">
+        {comidas.map((c, i) => {
+          const proteina = proteinas.find((p) => p.id === c.proteinaId);
+          const platoItem = platos.find((p) => p.id === c.proteinaId);
+          const precio = precioComida(
+            c,
+            modo,
+            proteinas,
+            opcionesDesayuno,
+            extrasConfig,
+            platos,
+            carbohidratosFull,
+            vegetalesFull
+          );
+          const tipoLabel =
+            c.tipo === "desayuno"
+              ? t.wizard.breakfast
+              : c.tipo === "plato"
+                ? t.wizard.plato
+                : c.tipo === "keto"
+                  ? t.wizard.keto
+                  : t.wizard.regularMeal;
+          const detalle =
+            c.tipo === "desayuno"
+              ? c.carbohidrato
+              : c.tipo === "plato"
+                ? platoItem?.nombre ?? ""
+                : c.tipo === "keto"
+                  ? `${c.carbohidrato} + ${proteina?.nombre ?? ""}`
+                  : `${proteina?.nombre ?? ""} + ${c.carbohidrato}${
+                      c.vegetal ? ` + ${c.vegetal}` : ""
+                    }`;
+
+          return (
+            <div
+              key={i}
+              className="rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white p-[16px]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => onEditarComida(i)}
+                  className="flex-1 text-left cursor-pointer"
+                >
+                  <span className="block text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] uppercase">
+                    {t.wizard.mealEdit(i + 1, tipoLabel)}
+                  </span>
+                  <span className="mt-1 block text-sm leading-relaxed text-[#17330A]">
+                    {detalle}
+                    {c.extraActivo && c.extras && c.extras.length > 0
+                      ? ` + ${c.extras.join(", ")}`
+                      : ""}
+                    {modo === "macro" && c.tipo !== "desayuno"
+                      ? c.tipo === "keto" || c.gramosCarbohidrato === null
+                        ? ` (${t.wizard.gramsProtein(c.gramosProteina)})`
+                        : ` (${t.wizard.gramsProteinCarb(
+                            c.gramosProteina,
+                            c.gramosCarbohidrato
+                          )})`
+                      : ""}
+                  </span>
+                  {c.comentario && (
+                    <span className="mt-1 block text-[11px] italic text-on-surface-variant">
+                      {t.wizard.note}: {c.comentario}
+                    </span>
+                  )}
+                </button>
+                <span className="shrink-0 text-[15px] font-bold text-[#17330A]">
+                  {formatearMoneda(precio)}
+                </span>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => onEditarComida(i)}
+                  aria-label={t.common.edit}
+                  title={t.common.edit}
+                  className="flex items-center gap-1.5 rounded-lg border border-[#CFCBA8] bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-[#2F6E00] transition-colors hover:border-[#2F6E00]/60 cursor-pointer"
+                >
+                  <Pencil size={12} />
+                  {t.common.edit}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDuplicarComida(i)}
+                  aria-label={t.common.duplicate}
+                  title={t.common.duplicate}
+                  className="flex items-center gap-1.5 rounded-lg border border-[#CFCBA8] bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-[#2F6E00] transition-colors hover:border-[#2F6E00]/60 cursor-pointer"
+                >
+                  <Copy size={12} />
+                  {t.common.duplicate}
+                </button>
+                {comidas.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => onEliminarComida(i)}
+                    aria-label={t.common.remove}
+                    title={t.common.remove}
+                    className="flex items-center gap-1.5 rounded-lg border border-[#CFCBA8] bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-red-600 transition-colors hover:border-red-300 cursor-pointer"
+                  >
+                    <Trash2 size={12} />
+                    {t.common.remove}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        type="button"
+        onClick={onAgregarComida}
+        className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[16px] border-[1.5px] border-dashed border-[#2F6E00]/50 bg-[#EAF4DC]/60 text-sm font-bold text-[#2F6E00] transition-all active:scale-[0.99] cursor-pointer"
+      >
+        <Plus size={18} />
+        {t.wizard.addMeal}
+      </button>
+
+      <div className="space-y-1.5">
+        <label
+          htmlFor="order-comment"
+          className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]"
+        >
+          {t.wizard.orderComment}
+        </label>
+        <textarea
+          id="order-comment"
+          rows={3}
+          value={comentario}
+          onChange={(e) => onComentarioChange(e.target.value)}
+          placeholder={t.wizard.orderCommentPlaceholder}
+          className="w-full resize-none rounded-xl border border-[#CFC7B0] bg-white px-3.5 py-3 text-sm text-[#1D2B14] placeholder:text-[#8E9685] focus:border-[#2F6E00] focus:outline-none focus:ring-2 focus:ring-[#2F6E00]/20"
+        />
+      </div>
+
+      <div className="space-y-3 rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white p-[16px]">
+        <div className="flex items-start gap-2.5">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-[#B45309]" />
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]">
+              {t.wizard.allergyQuestion}
+            </p>
+            <p className="mt-0.5 text-xs text-[#5C6B50]">
+              {t.wizard.allergyHint}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <Chip
+            label={t.wizard.allergyYes}
+            selected={alergias === "si"}
+            onClick={() => onAlergiasChange("si")}
+            className="flex-1"
+          />
+          <Chip
+            label={t.wizard.allergyNo}
+            selected={alergias === "no"}
+            onClick={() => onAlergiasChange("no")}
+            className="flex-1"
+          />
+        </div>
+
+        {alergias === "si" && (
+          <div className="space-y-1.5">
+            <label
+              htmlFor="allergy-details"
+              className="block text-[11px] font-bold uppercase tracking-[0.08em] text-[#3D4A33]"
+            >
+              {t.wizard.allergyDetails}
+            </label>
+            <textarea
+              id="allergy-details"
+              rows={2}
+              value={detalleAlergias}
+              onChange={(e) => onDetalleAlergiasChange(e.target.value)}
+              placeholder={t.wizard.allergyPlaceholder}
+              className="w-full resize-none rounded-xl border border-[#CFC7B0] bg-white px-3.5 py-3 text-sm text-[#1D2B14] placeholder:text-[#8E9685] focus:border-[#2F6E00] focus:outline-none focus:ring-2 focus:ring-[#2F6E00]/20"
+            />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PasoResumen({
   comidas,
   modo,
@@ -2300,6 +2653,9 @@ function PasoResumen({
   subtotal,
   descuentoPct,
   total,
+  comentarioPedido,
+  alergias,
+  detalleAlergias,
   onEditarPaso,
   onEditarComida,
   onEditarSetup,
@@ -2325,6 +2681,9 @@ function PasoResumen({
   subtotal: number;
   descuentoPct: number;
   total: number;
+  comentarioPedido?: string;
+  alergias?: "si" | "no" | "";
+  detalleAlergias?: string;
   onEditarPaso?: (paso: number) => void;
   onEditarComida?: (indice: number) => void;
   onEditarSetup?: () => void;
@@ -2367,6 +2726,26 @@ function PasoResumen({
           </div>
         </div>
       </button>
+
+      {(comentarioPedido?.trim() || alergias) && (
+        <div className="p-[16px] rounded-[16px] border-[1.5px] border-[#CFCBA8] bg-white">
+          <span className="text-[12px] font-bold tracking-[0.08em] text-[#2F6E00] uppercase">
+            {t.wizard.orderNotes}
+          </span>
+          <div className="mt-2 text-sm leading-relaxed text-[#17330A]">
+            {comentarioPedido?.trim()}
+            {comentarioPedido?.trim() && alergias && <br />}
+            {alergias && (
+              <>
+                <strong>{t.wizard.allergyShort}:</strong>{" "}
+                {alergias === "si"
+                  ? detalleAlergias?.trim() || t.wizard.allergyYes
+                  : t.wizard.allergyNo}
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         {comidas.map((c, i) => {
@@ -2428,14 +2807,16 @@ function PasoResumen({
                 <Copy size={12} />
                 {t.common.duplicate}
               </button>
-              <button
-                type="button"
-                onClick={() => onEliminarComida(i)}
-                className="text-[11px] font-bold text-red-600 uppercase tracking-wider px-3 py-1.5 rounded-lg border border-[#CFCBA8] bg-white hover:border-red-300 transition-colors flex items-center gap-1.5 cursor-pointer"
-              >
-                <Trash2 size={12} />
-                {t.common.remove}
-              </button>
+              {comidas.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => onEliminarComida(i)}
+                  className="text-[11px] font-bold text-red-600 uppercase tracking-wider px-3 py-1.5 rounded-lg border border-[#CFCBA8] bg-white hover:border-red-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Trash2 size={12} />
+                  {t.common.remove}
+                </button>
+              )}
             </div>
             </div>
           );

@@ -8,6 +8,7 @@ import { obtenerConfiguracion } from "@/models/configuracion.model";
 import { obtenerListaDescuentos } from "@/models/codigos-descuento.model";
 import { listarSedesActivas } from "@/models/sedes.model";
 import { listarOpcionesMenu, listarExtrasConfig } from "@/models/menu.model";
+import { precioKeto } from "@/lib/keto-precios";
 import type { ComidaPedido, DiaEntrega, ModoPedido, OpcionMenu, TipoEntrega } from "@/models/types";
 
 export type DatosEntrega = {
@@ -167,13 +168,15 @@ function precioComidaServidor(
     return !isNaN(precioBD) && precioBD > 0 ? precioBD : 0;
   }
 
-  // Comida keto: el plato define el precio y la proteína va incluida.
+  // Comida keto: el precio se define por la regla de keto-precios.
   const platoKeto = opcionesMenu.find(
     (o) => o.categoria === "plato" && o.es_keto && o.nombre === c.carbohidrato
   );
   if (platoKeto) {
-    const precioBD = Number(platoKeto.precio_racion);
-    return !isNaN(precioBD) && precioBD > 0 ? precioBD : 0;
+    const proteina = opcionesMenu.find(
+      (o) => o.categoria === "proteina" && o.nombre === c.proteina
+    );
+    return precioKeto(c.carbohidrato ?? "", proteina?.nombre, platoKeto.precio_racion);
   }
 
   if (!c.carbohidrato && !c.vegetal && !c.extra) {

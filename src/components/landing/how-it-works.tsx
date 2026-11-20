@@ -1,6 +1,7 @@
 "use client";
 
 import { useLanguage } from "@/lib/i18n";
+import { Microwave } from "lucide-react";
 
 export function HowItWorks() {
   const { t } = useLanguage();
@@ -33,6 +34,20 @@ export function HowItWorks() {
             </p>
           </div>
         ))}
+      </div>
+
+      <div className="mt-6 flex items-start gap-4 rounded-[24px] border-[1.5px] border-[#D7E3C0] bg-[#EAF4DC] p-5 sm:p-6">
+        <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-[#2F6E00] text-white shadow-2xs">
+          <Microwave size={22} />
+        </span>
+        <div>
+          <h3 className="font-poppins text-base sm:text-lg font-extrabold text-[#17330A]">
+            {t.how.microwaveTitle}
+          </h3>
+          <p className="font-sans text-sm sm:text-base text-[#17330A]/80 leading-relaxed">
+            {t.how.microwaveText}
+          </p>
+        </div>
       </div>
     </section>
   );

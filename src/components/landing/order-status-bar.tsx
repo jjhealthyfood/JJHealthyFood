@@ -8,7 +8,7 @@ import { useLanguage } from "@/lib/i18n";
  * openDays usa el formato de Date#getDay(): 0 = domingo … 6 = sábado.
  */
 export const ORDERS_CONFIG = {
-  openDays: [2, 3, 4, 5], // martes a viernes
+  openDays: [1, 2, 3, 4, 5], // lunes a viernes
   closeHour: 18, // 6:00 PM
   timezone: "America/New_York",
 };

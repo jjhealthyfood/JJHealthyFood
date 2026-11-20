@@ -39,7 +39,7 @@ const en = {
   },
   status: {
     open: "Orders open now · close Friday 6pm",
-    closed: "Orders closed · reopen Tuesday",
+    closed: "Orders closed · reopen Monday",
   },
   ribbon: {
     delivery: "Free delivery",
@@ -67,6 +67,9 @@ const en = {
   how: {
     title: "How it works",
     subtitle: "A simple process to get fresh, healthy meals ready for you.",
+    microwaveTitle: "3 minutes in the microwave",
+    microwaveText:
+      "Just reheat your meal for 3 minutes and it's ready to eat. No cooking, no cleanup.",
     steps: [
       {
         title: "Pick your meals",
@@ -80,7 +83,7 @@ const en = {
       {
         title: "Pickup or delivery",
         description:
-          "Pick a pickup spot or enter your address, for Sunday or Monday. Orders open Tuesday through Friday 6pm for that week.",
+          "Pick a pickup spot or enter your address, for Sunday or Monday. Orders open Monday through Friday 6pm for that week.",
       },
       {
         title: "Confirm on WhatsApp",
@@ -187,12 +190,13 @@ const en = {
   wizard: {
     buildOrder: "Build your order",
     headerTagline: "BUILD YOUR ORDER",
-    stepOf: (n: number) => `Step ${n} of 4`,
-    stepSetup: "Step 1 of 4 · Order setup",
-    stepMeal: (n: number, total: number) => `Step 2 of 4 · Meal ${n} of ${total}`,
-    stepDeliveryPickup: "Step 3 of 4 · Pickup",
-    stepDeliveryDelivery: "Step 3 of 4 · Delivery",
-    stepSummary: "Step 4 of 4 · Summary",
+    stepOf: (n: number) => `Step ${n} of 5`,
+    stepSetup: "Step 1 of 5 · Order setup",
+    stepMeal: (n: number, total: number) => `Step 2 of 5 · Meal ${n} of ${total}`,
+    stepReview: "Step 3 of 5 · Review your order",
+    stepDeliveryPickup: "Step 4 of 5 · Pickup",
+    stepDeliveryDelivery: "Step 4 of 5 · Delivery",
+    stepSummary: "Step 5 of 5 · Summary",
     howMany: "HOW MANY MEALS DO YOU WANT?",
     howWant: "HOW DO YOU WANT YOUR MEALS?",
     appliesAll: "This applies to every meal in this order.",
@@ -200,7 +204,7 @@ const en = {
     byPortionDesc: "Standard portion of protein, carb, and veggie.",
     macro: "Macro",
     macroDesc: "Adjustable protein amount for your macros.",
-    ordersOpen: "Orders open Tuesday through Friday 6pm for that week.",
+    ordersOpen: "Orders open Monday through Friday 6pm for that week.",
     mealN: (n: number) => `Meal ${n}`,
     chooseType: "Choose the meal type, then build your ingredients.",
     mealType: "MEAL TYPE",
@@ -264,6 +268,22 @@ const en = {
     schedulingNextWeek: "Scheduling for next week",
     summaryTitle: "Your order summary",
     summaryText: "Review everything before sending it via WhatsApp. Tap any card to edit it.",
+    reviewTitle: "Review your order",
+    reviewText:
+      "Check your meals, add a comment, or tell us about any food allergies before choosing pickup or delivery.",
+    addMeal: "Add another meal",
+    orderComment: "ORDER COMMENT (OPTIONAL)",
+    orderCommentPlaceholder: "e.g. sauces on the side, extra napkins…",
+    orderNotes: "ORDER NOTES",
+    allergyQuestion: "DO YOU HAVE ANY FOOD ALLERGIES?",
+    allergyHint: "We need to know before we cook your meals.",
+    allergyYes: "Yes",
+    allergyNo: "No",
+    allergyDetails: "WHICH ONES?",
+    allergyPlaceholder: "e.g. peanuts, shellfish, lactose…",
+    orderCommentShort: "ORDER COMMENT · EDIT",
+    allergyShort: "Allergies",
+    returnToReview: "Back to review",
     orderSetup: "Order setup",
     total: "Total",
     subtotal: "Subtotal",
@@ -301,8 +321,8 @@ const en = {
     copyOrder: "Didn't open? Copy order text",
     copied: "Order copied!",
     newOrder: "Start a new order",
-    stepPickupDelivery: "Step 3 of 4 · Pickup & Delivery",
-    stepSummaryCheckout: "Step 4 of 4 · Summary & Checkout",
+    stepPickupDelivery: "Step 4 of 5 · Pickup & Delivery",
+    stepSummaryCheckout: "Step 5 of 5 · Summary & Checkout",
     mealsSoFar: (n: number) => `Your meals so far (${n})`,
     mealsCount: (n: number) => `${n} ${n === 1 ? "meal" : "meals"}`,
     orderCopyTitle: "JJ Meals - New order",
@@ -366,7 +386,7 @@ const es: Dict = {
   },
   status: {
     open: "Pedidos abiertos · cierra viernes 6pm",
-    closed: "Pedidos cerrados · reabren el martes",
+    closed: "Pedidos cerrados · reabren el lunes",
   },
   ribbon: {
     delivery: "Delivery gratis",
@@ -394,6 +414,9 @@ const es: Dict = {
   how: {
     title: "Cómo funciona",
     subtitle: "Un proceso simple para tener comidas frescas y saludables listas para ti.",
+    microwaveTitle: "3 minutos en el microondas",
+    microwaveText:
+      "Solo calienta tu comida 3 minutos y lista para comer. Sin cocinar ni limpiar.",
     steps: [
       {
         title: "Elige tus comidas",
@@ -407,7 +430,7 @@ const es: Dict = {
       {
         title: "Retiro o entrega",
         description:
-          "Elige un punto de retiro o tu dirección, para domingo o lunes. Los pedidos abren de martes a viernes 6pm para esa semana.",
+          "Elige un punto de retiro o tu dirección, para domingo o lunes. Los pedidos abren de lunes a viernes 6pm para esa semana.",
       },
       {
         title: "Confirma por WhatsApp",
@@ -514,12 +537,13 @@ const es: Dict = {
   wizard: {
     buildOrder: "Arma tu pedido",
     headerTagline: "ARMA TU PEDIDO",
-    stepOf: (n: number) => `Paso ${n} de 4`,
-    stepSetup: "Paso 1 de 4 · Configuración",
-    stepMeal: (n: number, total: number) => `Paso 2 de 4 · Comida ${n} de ${total}`,
-    stepDeliveryPickup: "Paso 3 de 4 · Retiro",
-    stepDeliveryDelivery: "Paso 3 de 4 · Entrega",
-    stepSummary: "Paso 4 de 4 · Resumen",
+    stepOf: (n: number) => `Paso ${n} de 5`,
+    stepSetup: "Paso 1 de 5 · Configuración",
+    stepMeal: (n: number, total: number) => `Paso 2 de 5 · Comida ${n} de ${total}`,
+    stepReview: "Paso 3 de 5 · Revisa tu pedido",
+    stepDeliveryPickup: "Paso 4 de 5 · Retiro",
+    stepDeliveryDelivery: "Paso 4 de 5 · Entrega",
+    stepSummary: "Paso 5 de 5 · Resumen",
     howMany: "¿CUÁNTAS COMIDAS QUIERES?",
     howWant: "¿CÓMO QUIERES TUS COMIDAS?",
     appliesAll: "Esto aplica a todas las comidas de este pedido.",
@@ -527,7 +551,7 @@ const es: Dict = {
     byPortionDesc: "Porción estándar de proteína, carbohidrato y vegetal.",
     macro: "Macro",
     macroDesc: "Cantidad de proteína ajustable para tus macros.",
-    ordersOpen: "Los pedidos abren de martes a viernes 6pm para esa semana.",
+    ordersOpen: "Los pedidos abren de lunes a viernes 6pm para esa semana.",
     mealN: (n: number) => `Comida ${n}`,
     chooseType: "Elige el tipo de comida y luego arma los ingredientes.",
     mealType: "TIPO DE COMIDA",
@@ -591,6 +615,22 @@ const es: Dict = {
     schedulingNextWeek: "Programando para la próxima semana",
     summaryTitle: "Resumen de tu pedido",
     summaryText: "Revisa todo antes de enviarlo por WhatsApp. Toca cualquier tarjeta para editarla.",
+    reviewTitle: "Revisa tu pedido",
+    reviewText:
+      "Revisa tus comidas, deja un comentario o dinos si tienes alguna alergia alimentaria antes de elegir retiro o entrega.",
+    addMeal: "Agregar otra comida",
+    orderComment: "COMENTARIO DEL PEDIDO (OPCIONAL)",
+    orderCommentPlaceholder: "ej. salsas aparte, servilletas extra…",
+    orderNotes: "NOTAS DEL PEDIDO",
+    allergyQuestion: "¿TIENES ALGUNA ALERGIA ALIMENTARIA?",
+    allergyHint: "Necesitamos saberlo antes de cocinar tus comidas.",
+    allergyYes: "Sí",
+    allergyNo: "No",
+    allergyDetails: "¿A CUÁL?",
+    allergyPlaceholder: "ej. maní, mariscos, lactosa…",
+    orderCommentShort: "COMENTARIO DEL PEDIDO · EDITAR",
+    allergyShort: "Alergias",
+    returnToReview: "Volver a revisar",
     orderSetup: "Configuración",
     total: "Total",
     subtotal: "Subtotal",
@@ -628,8 +668,8 @@ const es: Dict = {
     copyOrder: "¿No se abrió? Copiar el pedido",
     copied: "¡Pedido copiado!",
     newOrder: "Empezar un pedido nuevo",
-    stepPickupDelivery: "Paso 3 de 4 · Retiro o entrega",
-    stepSummaryCheckout: "Paso 4 de 4 · Resumen y envío",
+    stepPickupDelivery: "Paso 4 de 5 · Retiro o entrega",
+    stepSummaryCheckout: "Paso 5 de 5 · Resumen y envío",
     mealsSoFar: (n: number) => `Tus comidas hasta ahora (${n})`,
     mealsCount: (n: number) => `${n} ${n === 1 ? "comida" : "comidas"}`,
     orderCopyTitle: "JJ Meals - Nuevo pedido",
