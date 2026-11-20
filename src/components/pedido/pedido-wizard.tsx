@@ -1190,8 +1190,8 @@ function PasoComida({
   const platosKeto = (platos ?? []).filter((o) => o.es_keto);
   const platosNormales = platos ?? [];
   // Las proteínas keto no se ofrecen en las comidas regulares/macro.
-  const sencillas = proteinas.filter((p) => !p.es_keto && p.nivel === "sencilla");
-  const premium = proteinas.filter((p) => !p.es_keto && p.nivel === "premium");
+  const sencillas = proteinas.filter((p) => p.nivel === "sencilla");
+  const premium = proteinas.filter((p) => p.nivel === "premium");
 
   // El plato keto define qué proteínas lo acompañan (van incluidas).
   const platoKetoElegido = platosKeto.find(
