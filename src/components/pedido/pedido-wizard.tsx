@@ -1587,7 +1587,7 @@ function PasoComida({
                   {proteinasKeto.map((p) => (
                     <Chip
                       key={p.id}
-                      label={`${p.nombre} — $${Number(p.precio_racion) || 0}`}
+                      label={`${p.nombre} — $${precioKeto(platoKetoElegido.nombre, p.nombre, platoKetoElegido.precio_racion)}`}
                       selected={comida.proteinaId === p.id}
                       onClick={() => onCambiar({ proteinaId: p.id })}
                     />
