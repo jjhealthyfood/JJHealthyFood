@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReceiptText, Users, UtensilsCrossed, LogOut } from "lucide-react";
+import { ReceiptText, Users, UtensilsCrossed, MessageSquare, LogOut } from "lucide-react";
 import { logout } from "@/controllers/auth.actions";
 
 const links = [
   { href: "/dashboard", label: "Pedidos", icon: ReceiptText },
   { href: "/dashboard/clientes", label: "Clientes", icon: Users },
   { href: "/dashboard/menu", label: "Menú semanal", icon: UtensilsCrossed },
+  { href: "/dashboard/sugerencias", label: "Buzón de sugerencias", icon: MessageSquare },
 ];
 
 export function Sidebar() {

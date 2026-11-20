@@ -11,6 +11,7 @@ import { Reviews } from "@/components/landing/reviews";
 import { CtaBanner } from "@/components/landing/cta-banner";
 import { Footer } from "@/components/landing/footer";
 import { StickyOrderButton } from "@/components/landing/sticky-order-button";
+import { SuggestionBox } from "@/components/landing/suggestion-box";
 
 export const metadata: Metadata = {
   title: "JJ Meals — Fresh, Healthy Meal Prep in Florida",
@@ -35,6 +36,7 @@ export default function HomePage() {
         <DeliveryRibbon />
         <Reviews />
         <CtaBanner />
+        <SuggestionBox />
       </main>
       <Footer />
       <StickyOrderButton />
